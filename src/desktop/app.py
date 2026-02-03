@@ -1,13 +1,18 @@
+from src.core.coordinator import ReconCoordinator
 import sys
+import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
-                             QTableWidget, QTableWidgetItem, QHeaderView)
-from PySide6.QtCore import Qt
+                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox)
 
 class ReconApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.coordinator = ReconCoordinator()
+        self.path_a = None
+        self.path_b = None
         self.setWindowTitle("AI Recon Tool - Desktop (Phase 1)")
+        # ... [rest of init remains similar]
         self.setMinimumSize(800, 600)
 
         # Main Layout
@@ -44,16 +49,33 @@ class ReconApp(QMainWindow):
         # Connect Signals
         self.btn_file_a.clicked.connect(self.select_file_a)
         self.btn_file_b.clicked.connect(self.select_file_b)
+        self.btn_reconcile.clicked.connect(self.run_reconciliation)
 
     def select_file_a(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Group A", "", "Excel/CSV/PDF (*.xlsx *.xls *.csv *.pdf)")
         if path:
+            self.path_a = path
             self.lbl_a.setText(f"A: {path}")
 
     def select_file_b(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Group B", "", "Excel/CSV/PDF (*.xlsx *.xls *.csv *.pdf)")
         if path:
+            self.path_b = path
             self.lbl_b.setText(f"B: {path}")
+
+    def run_reconciliation(self):
+        if not self.path_a or not self.path_b:
+            QMessageBox.warning(self, "Error", "Please select both files.")
+            return
+            
+        try:
+            output_path = "recon_output.xlsx"
+            # In a full UI, we'd allow choosing the key via a dropdown
+            # For this baseline, we assume the first column is the key
+            self.coordinator.run_full_recon(self.path_a, self.path_b, key_col="ID", output_path=output_path)
+            QMessageBox.information(self, "Success", f"Report generated: {os.path.abspath(output_path)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed: {str(e)}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
