@@ -9,16 +9,23 @@ class SemanticMapper:
 
     def suggest_primary_key(self, df: pd.DataFrame) -> str:
         """Analyzes the DataFrame to suggest the most likely primary key column."""
+        # Clean headers again just in case
+        df.columns = [str(c).strip() for c in df.columns]
+        
         # 1. Look for unique values (100% uniqueness)
         for col in df.columns:
-            if df[col].nunique() == len(df) and len(df) > 0:
-                # Prioritize columns that look like IDs (contain 'id', 'ref', 'no', 'key')
-                if any(k in col.lower() for k in ['id', 'ref', 'no', 'key', 'code']):
+            # Drop NaN for uniqueness check
+            non_na_values = df[col].dropna()
+            if len(non_na_values) > 0 and non_na_values.nunique() == len(non_na_values):
+                # Prioritize columns that look like IDs
+                norm_col = "".join(filter(str.isalnum, str(col).lower()))
+                if any(k in norm_col for k in ['id', 'ref', 'no', 'key', 'code']):
                     return col
         
         # 2. Fallback to the first column with 100% uniqueness
         for col in df.columns:
-            if df[col].nunique() == len(df):
+            non_na_values = df[col].dropna()
+            if len(non_na_values) > 0 and non_na_values.nunique() == len(non_na_values):
                 return col
                 
         # 3. Ultimate fallback: The first column
@@ -35,6 +42,9 @@ class SemanticMapper:
                 if norm_a == norm_b and norm_a != "":
                     mapping[a] = b
                     break
+        
+        # LOGGING for debugging
+        print(f"DEBUG: Suggested Mapping -> {mapping}")
         return mapping
 
     def clean_column_names(self, df: pd.DataFrame) -> pd.DataFrame:

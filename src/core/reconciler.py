@@ -21,16 +21,15 @@ class ReconEngine:
                 if "".join(filter(str.isalnum, str(col_b).lower())) == norm_key:
                     mapping[key_col] = col_b
                     break
+        
+        # FINAL CHECK: If key_col is STILL not in mapping, force it as an identity mapping
+        # so the logic doesn't crash if they are literally the same file.
+        if key_col not in mapping and key_col in self.df_b.columns:
+            mapping[key_col] = key_col
 
         # 1. Align column names in B to match A for easier comparison
         inv_mapping = {v: k for k, v in mapping.items()}
         df_b_aligned = self.df_b.rename(columns=inv_mapping)
-        
-        # Ensure the key column exists in both after alignment
-        if key_col not in df_b_aligned.columns:
-            # Fallback: if we still can't find the key in B, we can't reconcile
-            # but let's try to be even more aggressive and just use the same index
-            pass
         
         # 2. Identify Row Deltas (Missing in A or B)
         keys_a = set(self.df_a[key_col])

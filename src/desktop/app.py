@@ -78,14 +78,28 @@ class ReconApp(QMainWindow):
             
         try:
             # 1. Load and Analyze
+            log_msg = []
+            
+            def log(m):
+                print(m)
+                log_msg.append(m)
+
+            log(f"Loading File A: {self.path_a}")
             df_a = self.coordinator.get_handler(self.path_a).read(self.path_a)
+            log(f"Loading File B: {self.path_b}")
             df_b = self.coordinator.get_handler(self.path_b).read(self.path_b)
             
+            log(f"Columns in A: {df_a.columns.tolist()}")
+            log(f"Columns in B: {df_b.columns.tolist()}")
+
             # Smart Key Detection
             detected_key = self.coordinator.mapper.suggest_primary_key(df_a)
+            log(f"Detected Key: {detected_key}")
             
             # AI Mapping Suggestions
             mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
+            log(f"Mapping: {mapping}")
+            
             self.update_mapping_table(mapping)
 
             # 2. Run the process
@@ -97,7 +111,17 @@ class ReconApp(QMainWindow):
                 f"Primary Key Detected: '{detected_key}'\n"
                 f"Report generated: {os.path.abspath(output_path)}")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed: {str(e)}")
+            import traceback
+            error_details = traceback.format_exc()
+            log(f"Detailed Error:\n{error_details}")
+            
+            # Show a detailed log window to the user
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Critical)
+            msg_box.setWindowTitle("Reconciliation Failed")
+            msg_box.setText(f"Error: {str(e)}")
+            msg_box.setDetailedText("\n".join(log_msg) + "\n\n" + error_details)
+            msg_box.exec()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
