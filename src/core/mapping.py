@@ -1,8 +1,5 @@
 import pandas as pd
 from typing import List, Dict
-# Note: In a real implementation, we would use an LLM (OpenAI/Anthropic) 
-# or Sentence-Transformers for embeddings. For this initial logic, 
-# we use a high-performance fuzzy matching approach.
 
 class SemanticMapper:
     """Matches columns from Group A to Group B using semantic similarity."""
@@ -26,14 +23,16 @@ class SemanticMapper:
                 
         # 3. Ultimate fallback: The first column
         return df.columns[0]
+
+    def suggest_mapping(self, cols_a: List[str], cols_b: List[str]) -> Dict[str, str]:
         """Suggests which column from A maps to which in B."""
         mapping = {}
-        # TODO: Integrate LLM Embedding similarity for "Amount" vs "Total Price"
-        # For now, we use normalized exact matching
+        # Simple similarity logic: normalized exact matching
+        # TODO: Integrate LLM Embedding similarity for "Amount" vs "Total Price" in Phase 2
         for a in cols_a:
-            normalized_a = a.lower().replace("_", " ").strip()
+            normalized_a = str(a).lower().replace("_", " ").replace(".", " ").strip()
             for b in cols_b:
-                normalized_b = b.lower().replace("_", " ").strip()
+                normalized_b = str(b).lower().replace("_", " ").replace(".", " ").strip()
                 if normalized_a == normalized_b:
                     mapping[a] = b
                     break
