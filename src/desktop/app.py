@@ -14,12 +14,16 @@ class ReconApp(QMainWindow):
         self.files_a = []
         self.files_b = []
         self.setWindowTitle("AI Recon Tool - Professional Suite")
-        self.setMinimumSize(1000, 750)
+        self.setMinimumSize(1100, 800)
+        
+        # Apply Dark Theme
+        self.apply_dark_theme()
 
         # Main Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        # ...
 
         # 1. File Management Section
         files_group = QGroupBox("1. Select Batches of Files")
@@ -126,19 +130,30 @@ class ReconApp(QMainWindow):
             
             # Suggest Mappings
             mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
-            self.update_mapping_table(mapping)
+            self.update_mapping_table(mapping, df_b.columns.tolist())
             
-            QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings in the table.")
+            QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings using the dropdowns.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Analysis failed: {str(e)}")
 
-    def update_mapping_table(self, mapping: dict):
+    def update_mapping_table(self, mapping: dict, cols_b: list):
         self.mapping_table.setRowCount(len(mapping))
         for row, (col_a, col_b) in enumerate(mapping.items()):
-            self.mapping_table.setItem(row, 0, QTableWidgetItem(col_a))
-            self.mapping_table.setItem(row, 1, QTableWidgetItem(col_b))
-            status_item = QTableWidgetItem("AI Matched")
-            status_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled) # Make status read-only
+            # Column A (Read Only)
+            item_a = QTableWidgetItem(col_a)
+            item_a.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            self.mapping_table.setItem(row, 0, item_a)
+            
+            # Column B (Dropdown for selection)
+            combo_b = QComboBox()
+            combo_b.addItems(cols_b)
+            if col_b in cols_b:
+                combo_b.setCurrentText(col_b)
+            self.mapping_table.setCellWidget(row, 1, combo_b)
+            
+            # Match Status
+            status_item = QTableWidgetItem("AI Suggestion")
+            status_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             self.mapping_table.setItem(row, 2, status_item)
 
     def run_reconciliation(self):
@@ -152,21 +167,69 @@ class ReconApp(QMainWindow):
             return
 
         try:
-            # Get current mapping from editable table
+            # Get current mapping from dropdown widgets in the table
             mapping = {}
             for row in range(self.mapping_table.rowCount()):
-                col_a = self.mapping_table.item(row, 0).text()
-                col_b = self.mapping_table.item(row, 1).text()
-                mapping[col_a] = col_b
+                item_a = self.mapping_table.item(row, 0)
+                combo_b = self.mapping_table.cellWidget(row, 1)
+                if item_a and combo_b:
+                    mapping[item_a.text()] = combo_b.currentText()
 
             # For Phase 1 Batch, we process the first pair
-            # (Future update: loop through all files for full batch merge)
             output_path = "batch_recon_output.xlsx"
             self.coordinator.run_full_recon(self.files_a[0], self.files_b[0], key_col=key_col, output_path=output_path)
             
             QMessageBox.information(self, "Success", f"Reconciliation Complete!\n\nKey Used: {key_col}\nOutput: {os.path.abspath(output_path)}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Reconciliation failed: {str(e)}")
+
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                font-family: 'Segoe UI', Arial;
+            }
+            QGroupBox {
+                border: 2px solid #3d3d3d;
+                border-radius: 8px;
+                margin-top: 20px;
+                font-weight: bold;
+                color: #2196F3;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+            QPushButton {
+                background-color: #333333;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 8px;
+                color: #e0e0e0;
+            }
+            QPushButton:hover {
+                background-color: #444444;
+                border: 1px solid #2196F3;
+            }
+            QListWidget, QTableWidget, QComboBox {
+                background-color: #252526;
+                border: 1px solid #3d3d3d;
+                color: #e0e0e0;
+                gridline-color: #3d3d3d;
+            }
+            QHeaderView::section {
+                background-color: #333333;
+                color: #e0e0e0;
+                padding: 5px;
+                border: 1px solid #3d3d3d;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #252526;
+                selection-background-color: #2196F3;
+            }
+        """)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
