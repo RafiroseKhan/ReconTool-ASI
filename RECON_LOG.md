@@ -19,13 +19,14 @@ This log tracks technical decisions, architecture pivots, and implementation det
 ### Current Sprint: Stage 3 (Reconciliation Core)
 - **Objective:** Developing `reconciler.py` to handle key-based row matching and cell-by-cell delta detection.
 
-## [2026-02-02] - Stage 5 Update (API & Interface)
+## [2026-02-02] - Stage 5 Update (Desktop UI)
 
 ### Implementation Details
-- **FastAPI Backend:** Created `src/api/main.py`. 
-- **Features:**
-    - Implemented file upload endpoints for Group A and Group B.
-    - Integrated `Form` data handling for passing the Unique Key and Column Mapping JSON.
-    - Set up a local `uploads/` directory management for temporary file processing.
-- **Design Decision:** The API is built to be "Stateless." You send the files and the mapping, and it returns the result. This makes it easy to scale or host on a server later.
-- **Next Step:** Initializing the Windows Desktop (PySide6) UI skeleton.
+- **Windows Desktop App:** Created `src/desktop/app.py` using **PySide6 (Qt)**.
+- **UI Features:**
+    - Dual file selection interface for Group A and Group B.
+    - Integrated a `QTableWidget` to display AI-suggested column mappings.
+    - Styled "Run Reconciliation" button for professional look and feel.
+    - Signal-slot architecture ready to be connected to the `ReconEngine`.
+- **Logic:** The UI is designed to be a standalone client that can either run the engine locally or call the FastAPI backend, fulfilling the cross-platform requirement.
+- **Next Step:** The "Wiring" - connecting the Handlers, Engine, and UI for a complete end-to-end test.
