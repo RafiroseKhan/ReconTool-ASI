@@ -19,13 +19,13 @@ This log tracks technical decisions, architecture pivots, and implementation det
 ### Current Sprint: Stage 3 (Reconciliation Core)
 - **Objective:** Developing `reconciler.py` to handle key-based row matching and cell-by-cell delta detection.
 
-## [2026-02-02] - Stage 4 Update (Reporting)
+## [2026-02-02] - Stage 5 Update (API & Interface)
 
 ### Implementation Details
-- **ExcelReporter:** Created `src/handlers/excel_reporter.py`. Initialized the report generator using `openpyxl`.
-- **Logic:** Defined a "Summary" sheet generator that captures high-level metrics (Total A, Total B, Matched, Mismatched, Missing).
-- **Styling:** Defined the color palette for the report:
-    - **Green (#C6EFCE):** Success/Match
-    - **Red (#FFC7CE):** Mismatch/Conflict
-    - **Yellow (#FFEB9C):** Missing/Warning
-- **Next Step:** Implementing the `_write_detailed_sheet` method to perform cell-by-cell styling on the reconciliation deltas.
+- **FastAPI Backend:** Created `src/api/main.py`. 
+- **Features:**
+    - Implemented file upload endpoints for Group A and Group B.
+    - Integrated `Form` data handling for passing the Unique Key and Column Mapping JSON.
+    - Set up a local `uploads/` directory management for temporary file processing.
+- **Design Decision:** The API is built to be "Stateless." You send the files and the mapping, and it returns the result. This makes it easy to scale or host on a server later.
+- **Next Step:** Initializing the Windows Desktop (PySide6) UI skeleton.
