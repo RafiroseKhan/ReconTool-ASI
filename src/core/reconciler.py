@@ -43,8 +43,9 @@ class ReconEngine:
         mismatches = []
         
         # Set index to key_col for fast lookup
-        a_indexed = self.df_a.set_index(key_col)
-        b_indexed = df_b_aligned.set_index(key_col)
+        # drop=False ensures the key remains in the columns for the comparison loop
+        a_indexed = self.df_a.set_index(key_col, drop=False)
+        b_indexed = self.df_b.rename(columns={v: k for k, v in mapping.items()}).set_index(key_col, drop=False)
         
         for key in common_keys:
             row_a = a_indexed.loc[key]
@@ -52,11 +53,13 @@ class ReconEngine:
             
             row_diffs = {}
             for col_a in mapping.keys():
-                val_a = row_a[col_a]
-                val_b = row_b[col_a] # Col B was renamed to match Col A
-                
-                if val_a != val_b:
-                    row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
+                # Ensure the column exists in both mapped rows
+                if col_a in row_a.index and col_a in row_b.index:
+                    val_a = row_a[col_a]
+                    val_b = row_b[col_a]
+                    
+                    if str(val_a) != str(val_b):
+                        row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
             
             if row_diffs:
                 mismatches.append({

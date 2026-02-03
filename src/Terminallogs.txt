@@ -1,0 +1,47 @@
+PS C:\Users\RafiroseKhanShah\clawd\ai-recon-tool>  & 'c:\Users\RafiroseKhanShah\AppData\Local\Programs\Python\Python313\python.exe' 'c:\Users\RafiroseKhanShah\.vscode\extensions\ms-python.debugpy-2025.18.0-win32-x64\bundled\libs\debugpy\launcher' '59684' '--' '-m' 'src.desktop.app' 
+Loading File A: C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv
+DEBUG: First line of C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv: 'Trade Id,Product Description,Product Type,Sub Type,Product Extendedtype,Nominal,Trade Currency,Book,CounterParty,TradeStatus,Trade Date,Trade Settle Date,Trader,Entered User,External Reference,Trade Price,Quantity,Notional\n'
+DEBUG: Columns found: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+Loading File B: C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv
+DEBUG: First line of C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv: 'Trade Id,Product Description,Product Type,Sub Type,Product Extendedtype,Nominal,Trade Currency,Book,CounterParty,TradeStatus,Trade Date,Trade Settle Date,Trader,Entered User,External Reference,Trade Price,Quantity,Notional\n'
+DEBUG: Columns found: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+Columns in A: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+Columns in B: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+Detected Key: Trade Id
+DEBUG: Suggested Mapping -> {'Trade Id': 'Trade Id', 'Product Description': 'Product Description', 'Product Type': 'Product Type', 'Sub Type': 'Sub Type', 'Product Extendedtype': 'Product Extendedtype', 'Nominal': 'Nominal', 'Trade Currency': 'Trade Currency', 'Book': 'Book', 'CounterParty': 'CounterParty', 'TradeStatus': 'TradeStatus', 'Trade Date': 'Trade Date', 'Trade Settle Date': 'Trade Settle Date', 'Trader': 'Trader', 'Entered User': 'Entered User', 'External Reference': 'External Reference', 'Trade Price': 'Trade Price', 'Quantity': 'Quantity', 'Notional': 'Notional'}
+Mapping: {'Trade Id': 'Trade Id', 'Product Description': 'Product Description', 'Product Type': 'Product Type', 'Sub Type': 'Sub Type', 'Product Extendedtype': 'Product Extendedtype', 'Nominal': 'Nominal', 'Trade Currency': 'Trade Currency', 'Book': 'Book', 'CounterParty': 'CounterParty', 'TradeStatus': 'TradeStatus', 'Trade Date': 'Trade Date', 'Trade Settle Date': 'Trade Settle Date', 'Trader': 'Trader', 'Entered User': 'Entered User', 'External Reference': 'External Reference', 'Trade Price': 'Trade Price', 'Quantity': 'Quantity', 'Notional': 'Notional'}
+DEBUG: First line of C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv: 'Trade Id,Product Description,Product Type,Sub Type,Product Extendedtype,Nominal,Trade Currency,Book,CounterParty,TradeStatus,Trade Date,Trade Settle Date,Trader,Entered User,External Reference,Trade Price,Quantity,Notional\n'
+DEBUG: Columns found: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+DEBUG: First line of C:/Users/RafiroseKhanShah/Recon Test Cases/GroupA/tempDocument_1_1765880545323.csv: 'Trade Id,Product Description,Product Type,Sub Type,Product Extendedtype,Nominal,Trade Currency,Book,CounterParty,TradeStatus,Trade Date,Trade Settle Date,Trader,Entered User,External Reference,Trade Price,Quantity,Notional\n'
+DEBUG: Columns found: ['Trade Id', 'Product Description', 'Product Type', 'Sub Type', 'Product Extendedtype', 'Nominal', 'Trade Currency', 'Book', 'CounterParty', 'TradeStatus', 'Trade Date', 'Trade Settle Date', 'Trader', 'Entered User', 'External Reference', 'Trade Price', 'Quantity', 'Notional']
+DEBUG: Suggested Mapping -> {'Trade Id': 'Trade Id', 'Product Description': 'Product Description', 'Product Type': 'Product Type', 'Sub Type': 'Sub Type', 'Product Extendedtype': 'Product Extendedtype', 'Nominal': 'Nominal', 'Trade Currency': 'Trade Currency', 'Book': 'Book', 'CounterParty': 'CounterParty', 'TradeStatus': 'TradeStatus', 'Trade Date': 'Trade Date', 'Trade Settle Date': 'Trade Settle Date', 'Trader': 'Trader', 'Entered User': 'Entered User', 'External Reference': 'External Reference', 'Trade Price': 'Trade Price', 'Quantity': 'Quantity', 'Notional': 'Notional'}
+Detailed Error:
+Traceback (most recent call last):
+  File "c:\Users\RafiroseKhanShah\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 3641, in get_loc
+    return self._engine.get_loc(casted_key)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "pandas/_libs/index.pyx", line 168, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/index.pyx", line 197, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7668, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7676, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'Trade Id'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\RafiroseKhanShah\clawd\ai-recon-tool\src\desktop\app.py", line 107, in run_reconciliation
+    self.coordinator.run_full_recon(self.path_a, self.path_b, key_col=detected_key, output_path=output_path)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\RafiroseKhanShah\clawd\ai-recon-tool\src\core\coordinator.py", line 46, in run_full_recon
+    recon_data = engine.reconcile(key_col, mapping)
+  File "C:\Users\RafiroseKhanShah\clawd\ai-recon-tool\src\core\reconciler.py", line 55, in reconcile
+    val_a = row_a[col_a]
+            ~~~~~^^^^^^^
+  File "c:\Users\RafiroseKhanShah\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\series.py", line 959, in __getitem__
+    return self._get_value(key)
+           ~~~~~~~~~~~~~~~^^^^^
+  File "c:\Users\RafiroseKhanShah\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\series.py", line 1046, in _get_value
+    loc = self.index.get_loc(label)
+  File "c:\Users\RafiroseKhanShah\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 3648, in get_loc
+    raise KeyError(key) from err
+KeyError: 'Trade Id'
