@@ -27,17 +27,14 @@ class SemanticMapper:
     def suggest_mapping(self, cols_a: List[str], cols_b: List[str]) -> Dict[str, str]:
         """Suggests which column from A maps to which in B."""
         mapping = {}
-        # Simple similarity logic: normalized exact matching
-        # TODO: Integrate LLM Embedding similarity for "Amount" vs "Total Price" in Phase 2
         for a in cols_a:
-            normalized_a = str(a).lower().replace("_", " ").replace(".", " ").strip()
+            # Normalize: lower case, remove non-alphanumeric, strip spaces
+            norm_a = "".join(filter(str.isalnum, str(a).lower()))
             for b in cols_b:
-                normalized_b = str(b).lower().replace("_", " ").replace(".", " ").strip()
-                if normalized_a == normalized_b:
+                norm_b = "".join(filter(str.isalnum, str(b).lower()))
+                if norm_a == norm_b and norm_a != "":
                     mapping[a] = b
                     break
-        
-        # Ensure the key column is in the mapping if it exists in both
         return mapping
 
     def clean_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
