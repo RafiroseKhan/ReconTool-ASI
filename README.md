@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI Recon Tool
 
 A high-precision reconciliation engine with AI-powered OCR and semantic column mapping.
@@ -14,3 +15,6 @@ A high-precision reconciliation engine with AI-powered OCR and semantic column m
 3. [ ] Semantic AI Mapping
 4. [ ] Reconciliation Engine
 5. [ ] UI & API Interfaces
+=======
+# ReconTool-ASI
+>>>>>>> 28d7f4c76b0ae64fca408282cfa9ca85fb540323
