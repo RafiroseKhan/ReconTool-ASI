@@ -63,15 +63,28 @@ class ReconApp(QMainWindow):
             self.path_b = path
             self.lbl_b.setText(f"B: {path}")
 
+    def update_mapping_table(self, mapping: dict):
+        """Updates the UI table with AI-suggested column mappings."""
+        self.mapping_table.setRowCount(len(mapping))
+        for row, (col_a, col_b) in enumerate(mapping.items()):
+            self.mapping_table.setItem(row, 0, QTableWidgetItem(col_a))
+            self.mapping_table.setItem(row, 1, QTableWidgetItem(col_b))
+            self.mapping_table.setItem(row, 2, QTableWidgetItem("High (AI)"))
+
     def run_reconciliation(self):
         if not self.path_a or not self.path_b:
             QMessageBox.warning(self, "Error", "Please select both files.")
             return
             
         try:
+            # 1. Preview Mapping first (Internal logic)
+            df_a = self.coordinator.get_handler(self.path_a).read(self.path_a)
+            df_b = self.coordinator.get_handler(self.path_b).read(self.path_b)
+            mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
+            self.update_mapping_table(mapping)
+
+            # 2. Run the actual process
             output_path = "recon_output.xlsx"
-            # In a full UI, we'd allow choosing the key via a dropdown
-            # For this baseline, we assume the first column is the key
             self.coordinator.run_full_recon(self.path_a, self.path_b, key_col="ID", output_path=output_path)
             QMessageBox.information(self, "Success", f"Report generated: {os.path.abspath(output_path)}")
         except Exception as e:
