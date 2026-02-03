@@ -33,12 +33,10 @@ This log tracks technical decisions, architecture pivots, and implementation det
 - **Architecture:** Verified that both platforms share the same core logic, fulfilling the cross-platform requirement.
 - **Git Sync:** Pushed the final Phase 1 wiring to GitHub.
 
-## [2026-02-03] - Smart Key Analysis
+## [2026-02-03] - Phase 1 UX & Batch Architecture
 
 ### Implementation Details
-- **Smart Key Detection:** Added `suggest_primary_key` to `src/core/mapping.py`.
-- **Logic:** 
-    1. Scan all columns for 100% unique values.
-    2. Prioritize unique columns with names like "ID", "Ref", "Code", or "Key".
-    3. Fall back to the first unique column found, or the first column if no unique ones exist.
-- **UI Integration:** The desktop app now runs this analysis automatically before reconciliation, removing the need for hardcoded or manual key entry.
+- **UI Redesign Plan:** Shifting to a 3-step workflow (Select -> Analyze -> Reconcile) to improve user clarity.
+- **Batch Processing:** Redesigning the `ReconCoordinator` to handle `List[str]` for file paths. This will support comparing a set of "Base" files against a set of "Comparison" files.
+- **Manual Overrides:** Adding a `QComboBox` for Primary Key selection and making the `QTableWidget` editable to allow users to fix AI mapping errors before processing.
+- **Reporting:** Updating the `ExcelReporter` to handle multi-file results in a single structured workbook.

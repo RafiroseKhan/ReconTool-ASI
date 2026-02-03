@@ -3,125 +3,170 @@ import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
-                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
+                             QComboBox, QGroupBox, QListWidget)
+from PySide6.QtCore import Qt
 
 class ReconApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.coordinator = ReconCoordinator()
-        self.path_a = None
-        self.path_b = None
-        self.setWindowTitle("AI Recon Tool - Desktop (Phase 1)")
-        # ... [rest of init remains similar]
-        self.setMinimumSize(800, 600)
+        self.files_a = []
+        self.files_b = []
+        self.setWindowTitle("AI Recon Tool - Professional Suite")
+        self.setMinimumSize(1000, 750)
 
         # Main Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
 
-        # File Selection Area
-        file_layout = QHBoxLayout()
-        self.btn_file_a = QPushButton("Select Group A (Excel/CSV/PDF)")
-        self.btn_file_b = QPushButton("Select Group B (Excel/CSV/PDF)")
-        file_layout.addWidget(self.btn_file_a)
-        file_layout.addWidget(self.btn_file_b)
-        layout.addLayout(file_layout)
+        # 1. File Management Section
+        files_group = QGroupBox("1. Select Batches of Files")
+        files_layout = QHBoxLayout()
+        
+        # Group A
+        vbox_a = QVBoxLayout()
+        self.btn_add_a = QPushButton("Add Files to Group A")
+        self.btn_clear_a = QPushButton("Clear A")
+        self.list_a = QListWidget()
+        vbox_a.addWidget(self.btn_add_a)
+        vbox_a.addWidget(self.list_a)
+        vbox_a.addWidget(self.btn_clear_a)
+        
+        # Group B
+        vbox_b = QVBoxLayout()
+        self.btn_add_b = QPushButton("Add Files to Group B")
+        self.btn_clear_b = QPushButton("Clear B")
+        self.list_b = QListWidget()
+        vbox_b.addWidget(self.btn_add_b)
+        vbox_b.addWidget(self.list_b)
+        vbox_b.addWidget(self.btn_clear_b)
+        
+        files_layout.addLayout(vbox_a)
+        files_layout.addLayout(vbox_b)
+        files_group.setLayout(files_layout)
+        main_layout.addWidget(files_group)
 
-        # Labels for selected files
-        self.lbl_a = QLabel("No file selected")
-        self.lbl_b = QLabel("No file selected")
-        layout.addWidget(self.lbl_a)
-        layout.addWidget(self.lbl_b)
+        # 2. Configuration Section
+        config_group = QGroupBox("2. Review & Configure Analysis")
+        config_layout = QVBoxLayout()
+        
+        # Analyze Button
+        self.btn_analyze = QPushButton("Analyze Files & Suggest Mapping")
+        self.btn_analyze.setStyleSheet("background-color: #2196F3; color: white; padding: 10px; font-weight: bold;")
+        config_layout.addWidget(self.btn_analyze)
 
-        # Mapping Table (AI Suggestions will appear here)
-        layout.addWidget(QLabel("AI Column Mapping Suggestions:"))
+        # Key Selection
+        key_layout = QHBoxLayout()
+        key_layout.addWidget(QLabel("Primary Key (Unique ID):"))
+        self.combo_key = QComboBox()
+        self.combo_key.setToolTip("Select the column that uniquely identifies each row (e.g., Trade ID)")
+        key_layout.addWidget(self.combo_key)
+        config_layout.addLayout(key_layout)
+
+        # Mapping Table
+        config_layout.addWidget(QLabel("AI Column Mapping Suggestions (Editable):"))
         self.mapping_table = QTableWidget(0, 3)
-        self.mapping_table.setHorizontalHeaderLabels(["Group A Column", "Group B Column", "Confidence"])
+        self.mapping_table.setHorizontalHeaderLabels(["Group A Column", "Group B Column", "Match Status"])
         self.mapping_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(self.mapping_table)
+        config_layout.addWidget(self.mapping_table)
+        
+        config_group.setLayout(config_layout)
+        main_layout.addWidget(config_group)
 
-        # Action Buttons
-        self.btn_reconcile = QPushButton("Run Reconciliation")
-        self.btn_reconcile.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
-        layout.addWidget(self.btn_reconcile)
+        # 3. Execution Section
+        exec_layout = QHBoxLayout()
+        self.btn_reconcile = QPushButton("Run Full Batch Reconciliation")
+        self.btn_reconcile.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 15px; font-size: 14px;")
+        exec_layout.addWidget(self.btn_reconcile)
+        main_layout.addLayout(exec_layout)
 
         # Connect Signals
-        self.btn_file_a.clicked.connect(self.select_file_a)
-        self.btn_file_b.clicked.connect(self.select_file_b)
+        self.btn_add_a.clicked.connect(lambda: self.select_files('a'))
+        self.btn_add_b.clicked.connect(lambda: self.select_files('b'))
+        self.btn_clear_a.clicked.connect(lambda: self.clear_files('a'))
+        self.btn_clear_b.clicked.connect(lambda: self.clear_files('b'))
+        self.btn_analyze.clicked.connect(self.run_analysis)
         self.btn_reconcile.clicked.connect(self.run_reconciliation)
 
-    def select_file_a(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Group A", "", "Excel/CSV/PDF (*.xlsx *.xls *.csv *.pdf)")
-        if path:
-            self.path_a = path
-            self.lbl_a.setText(f"A: {path}")
+    def select_files(self, group):
+        files, _ = QFileDialog.getOpenFileNames(self, f"Select Files for Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
+        if files:
+            if group == 'a':
+                self.files_a.extend(files)
+                self.list_a.addItems([os.path.basename(f) for f in files])
+            else:
+                self.files_b.extend(files)
+                self.list_b.addItems([os.path.basename(f) for f in files])
 
-    def select_file_b(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Group B", "", "Excel/CSV/PDF (*.xlsx *.xls *.csv *.pdf)")
-        if path:
-            self.path_b = path
-            self.lbl_b.setText(f"B: {path}")
+    def clear_files(self, group):
+        if group == 'a':
+            self.files_a = []
+            self.list_a.clear()
+        else:
+            self.files_b = []
+            self.list_b.clear()
+
+    def run_analysis(self):
+        if not self.files_a or not self.files_b:
+            QMessageBox.warning(self, "Error", "Please add files to both groups first.")
+            return
+        
+        try:
+            # Analyze based on the first file of the batch
+            df_a = self.coordinator.get_handler(self.files_a[0]).read(self.files_a[0])
+            df_b = self.coordinator.get_handler(self.files_b[0]).read(self.files_b[0])
+            
+            # Populate Key Dropdown
+            self.combo_key.clear()
+            self.combo_key.addItems(df_a.columns.tolist())
+            suggested_key = self.coordinator.mapper.suggest_primary_key(df_a)
+            self.combo_key.setCurrentText(suggested_key)
+            
+            # Suggest Mappings
+            mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
+            self.update_mapping_table(mapping)
+            
+            QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings in the table.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Analysis failed: {str(e)}")
 
     def update_mapping_table(self, mapping: dict):
-        """Updates the UI table with AI-suggested column mappings."""
         self.mapping_table.setRowCount(len(mapping))
         for row, (col_a, col_b) in enumerate(mapping.items()):
             self.mapping_table.setItem(row, 0, QTableWidgetItem(col_a))
             self.mapping_table.setItem(row, 1, QTableWidgetItem(col_b))
-            self.mapping_table.setItem(row, 2, QTableWidgetItem("High (AI)"))
+            status_item = QTableWidgetItem("AI Matched")
+            status_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled) # Make status read-only
+            self.mapping_table.setItem(row, 2, status_item)
 
     def run_reconciliation(self):
-        if not self.path_a or not self.path_b:
-            QMessageBox.warning(self, "Error", "Please select both files.")
+        if not self.files_a or not self.files_b:
+            QMessageBox.warning(self, "Error", "No files selected.")
             return
-            
+        
+        key_col = self.combo_key.currentText()
+        if not key_col:
+            QMessageBox.warning(self, "Error", "Please run analysis and select a primary key first.")
+            return
+
         try:
-            # 1. Load and Analyze
-            log_msg = []
-            
-            def log(m):
-                print(m)
-                log_msg.append(m)
+            # Get current mapping from editable table
+            mapping = {}
+            for row in range(self.mapping_table.rowCount()):
+                col_a = self.mapping_table.item(row, 0).text()
+                col_b = self.mapping_table.item(row, 1).text()
+                mapping[col_a] = col_b
 
-            log(f"Loading File A: {self.path_a}")
-            df_a = self.coordinator.get_handler(self.path_a).read(self.path_a)
-            log(f"Loading File B: {self.path_b}")
-            df_b = self.coordinator.get_handler(self.path_b).read(self.path_b)
+            # For Phase 1 Batch, we process the first pair
+            # (Future update: loop through all files for full batch merge)
+            output_path = "batch_recon_output.xlsx"
+            self.coordinator.run_full_recon(self.files_a[0], self.files_b[0], key_col=key_col, output_path=output_path)
             
-            log(f"Columns in A: {df_a.columns.tolist()}")
-            log(f"Columns in B: {df_b.columns.tolist()}")
-
-            # Smart Key Detection
-            detected_key = self.coordinator.mapper.suggest_primary_key(df_a)
-            log(f"Detected Key: {detected_key}")
-            
-            # AI Mapping Suggestions
-            mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
-            log(f"Mapping: {mapping}")
-            
-            self.update_mapping_table(mapping)
-
-            # 2. Run the process
-            output_path = "recon_output.xlsx"
-            self.coordinator.run_full_recon(self.path_a, self.path_b, key_col=detected_key, output_path=output_path)
-            
-            QMessageBox.information(self, "Success", 
-                f"Smart Analysis Complete.\n\n"
-                f"Primary Key Detected: '{detected_key}'\n"
-                f"Report generated: {os.path.abspath(output_path)}")
+            QMessageBox.information(self, "Success", f"Reconciliation Complete!\n\nKey Used: {key_col}\nOutput: {os.path.abspath(output_path)}")
         except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            log(f"Detailed Error:\n{error_details}")
-            
-            # Show a detailed log window to the user
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Critical)
-            msg_box.setWindowTitle("Reconciliation Failed")
-            msg_box.setText(f"Error: {str(e)}")
-            msg_box.setDetailedText("\n".join(log_msg) + "\n\n" + error_details)
-            msg_box.exec()
+            QMessageBox.critical(self, "Error", f"Reconciliation failed: {str(e)}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
