@@ -32,3 +32,10 @@ This log tracks technical decisions, architecture pivots, and implementation det
 - **Functionality:** Users can now upload files via the API or select them via the Windows GUI, and the system will execute the full end-to-end reconciliation (Read -> Map -> Compare -> Report).
 - **Architecture:** Verified that both platforms share the same core logic, fulfilling the cross-platform requirement.
 - **Git Sync:** Pushed the final Phase 1 wiring to GitHub.
+
+## [2026-02-03] - OCR & Mapping Refinement
+
+### Implementation Details
+- **OCR Smart Grouping:** Added `group_by_rows` to `src/handlers/ocr_handler.py`. It uses a coordinate-based threshold (default 10px) to cluster fragmented OCR text into logical rows.
+- **Why:** This solves the issue where scanned PDFs result in a "jumble" of text rather than a table.
+- **Next Step:** Implementing the Interactive Mapping View in the PySide6 app to allow users to override AI suggestions.

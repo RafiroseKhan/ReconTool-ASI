@@ -41,4 +41,26 @@ class OCRHandler:
                 "conf": prob
             })
             
-        return pd.DataFrame(data)
+    def group_by_rows(self, df: pd.DataFrame, y_threshold: int = 10) -> List[List[str]]:
+        """Groups OCR text snippets into logical rows based on Y-coordinates."""
+        if df.empty:
+            return []
+        
+        # Sort by Y then X
+        df = df.sort_values(by=['y', 'x'])
+        
+        rows = []
+        current_row = []
+        last_y = df.iloc[0]['y']
+        
+        for _, item in df.iterrows():
+            if abs(item['y'] - last_y) <= y_threshold:
+                current_row.append(item['text'])
+            else:
+                rows.append(current_row)
+                current_row = [item['text']]
+                last_y = item['y']
+        
+        if current_row:
+            rows.append(current_row)
+        return rows
