@@ -19,14 +19,14 @@ This log tracks technical decisions, architecture pivots, and implementation det
 ### Current Sprint: Stage 3 (Reconciliation Core)
 - **Objective:** Developing `reconciler.py` to handle key-based row matching and cell-by-cell delta detection.
 
-## [2026-02-02] - Stage 5 Update (Desktop UI)
+## [2026-02-02] - Stage 6 Update (The Wiring)
 
 ### Implementation Details
-- **Windows Desktop App:** Created `src/desktop/app.py` using **PySide6 (Qt)**.
-- **UI Features:**
-    - Dual file selection interface for Group A and Group B.
-    - Integrated a `QTableWidget` to display AI-suggested column mappings.
-    - Styled "Run Reconciliation" button for professional look and feel.
-    - Signal-slot architecture ready to be connected to the `ReconEngine`.
-- **Logic:** The UI is designed to be a standalone client that can either run the engine locally or call the FastAPI backend, fulfilling the cross-platform requirement.
-- **Next Step:** The "Wiring" - connecting the Handlers, Engine, and UI for a complete end-to-end test.
+- **ReconCoordinator:** Created `src/core/coordinator.py`. This is the "Master Controller" that links the Handlers, Semantic Mapper, Recon Engine, and Excel Reporter.
+- **Workflow:**
+    1. Detects file type and assigns correct handler.
+    2. Triggers AI semantic mapping to align columns.
+    3. Executes reconciliation logic.
+    4. Passes results to the color-coded Excel reporter.
+- **Architecture Integrity:** By using a Coordinator, the Desktop UI and the Web API now use the *exact same* single line of code to run a full reconciliation. This ensures consistency across both platforms.
+- **Next Step:** Finalizing the integration within `app.py` and `main.py` to call this coordinator.
