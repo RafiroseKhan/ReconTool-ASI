@@ -77,20 +77,25 @@ class ReconApp(QMainWindow):
             return
             
         try:
-            # 1. Preview Mapping first
+            # 1. Load and Analyze
             df_a = self.coordinator.get_handler(self.path_a).read(self.path_a)
             df_b = self.coordinator.get_handler(self.path_b).read(self.path_b)
             
-            # Auto-detect the key: Use the first column of File A as the default key
-            detected_key = df_a.columns[0]
+            # Smart Key Detection
+            detected_key = self.coordinator.mapper.suggest_primary_key(df_a)
             
+            # AI Mapping Suggestions
             mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
             self.update_mapping_table(mapping)
 
-            # 2. Run the actual process
+            # 2. Run the process
             output_path = "recon_output.xlsx"
             self.coordinator.run_full_recon(self.path_a, self.path_b, key_col=detected_key, output_path=output_path)
-            QMessageBox.information(self, "Success", f"Report generated using key '{detected_key}':\n{os.path.abspath(output_path)}")
+            
+            QMessageBox.information(self, "Success", 
+                f"Smart Analysis Complete.\n\n"
+                f"Primary Key Detected: '{detected_key}'\n"
+                f"Report generated: {os.path.abspath(output_path)}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed: {str(e)}")
 

@@ -33,9 +33,12 @@ This log tracks technical decisions, architecture pivots, and implementation det
 - **Architecture:** Verified that both platforms share the same core logic, fulfilling the cross-platform requirement.
 - **Git Sync:** Pushed the final Phase 1 wiring to GitHub.
 
-## [2026-02-03] - OCR & Mapping Refinement
+## [2026-02-03] - Smart Key Analysis
 
 ### Implementation Details
-- **OCR Smart Grouping:** Added `group_by_rows` to `src/handlers/ocr_handler.py`. It uses a coordinate-based threshold (default 10px) to cluster fragmented OCR text into logical rows.
-- **Why:** This solves the issue where scanned PDFs result in a "jumble" of text rather than a table.
-- **Next Step:** Implementing the Interactive Mapping View in the PySide6 app to allow users to override AI suggestions.
+- **Smart Key Detection:** Added `suggest_primary_key` to `src/core/mapping.py`.
+- **Logic:** 
+    1. Scan all columns for 100% unique values.
+    2. Prioritize unique columns with names like "ID", "Ref", "Code", or "Key".
+    3. Fall back to the first unique column found, or the first column if no unique ones exist.
+- **UI Integration:** The desktop app now runs this analysis automatically before reconciliation, removing the need for hardcoded or manual key entry.

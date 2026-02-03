@@ -10,7 +10,22 @@ class SemanticMapper:
     def __init__(self, threshold: float = 0.8):
         self.threshold = threshold
 
-    def suggest_mapping(self, cols_a: List[str], cols_b: List[str]) -> Dict[str, str]:
+    def suggest_primary_key(self, df: pd.DataFrame) -> str:
+        """Analyzes the DataFrame to suggest the most likely primary key column."""
+        # 1. Look for unique values (100% uniqueness)
+        for col in df.columns:
+            if df[col].nunique() == len(df) and len(df) > 0:
+                # Prioritize columns that look like IDs (contain 'id', 'ref', 'no', 'key')
+                if any(k in col.lower() for k in ['id', 'ref', 'no', 'key', 'code']):
+                    return col
+        
+        # 2. Fallback to the first column with 100% uniqueness
+        for col in df.columns:
+            if df[col].nunique() == len(df):
+                return col
+                
+        # 3. Ultimate fallback: The first column
+        return df.columns[0]
         """Suggests which column from A maps to which in B."""
         mapping = {}
         # TODO: Integrate LLM Embedding similarity for "Amount" vs "Total Price"
