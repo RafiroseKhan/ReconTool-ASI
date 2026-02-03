@@ -30,11 +30,21 @@ class ReconCoordinator:
 
         # 2. Get Semantic Mapping (Auto-suggest)
         mapping = self.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
+        
+        # 3. Validate Key Column exists in the mapping (or is a direct match)
+        # If the key_col detected in A doesn't have a direct equivalent in B's columns
+        # we need to find what B calls that key.
+        key_in_b = mapping.get(key_col, key_col)
+        
+        if key_col not in df_a.columns:
+            raise ValueError(f"Primary Key '{key_col}' not found in Group A")
+        if key_in_b not in df_b.columns:
+             raise ValueError(f"Primary Key '{key_col}' (mapped to '{key_in_b}') not found in Group B")
 
-        # 3. Reconcile
+        # 4. Reconcile
         engine = ReconEngine(df_a, df_b)
         recon_data = engine.reconcile(key_col, mapping)
 
-        # 4. Generate Report
+        # 5. Generate Report
         self.reporter.generate_report(recon_data, output_path)
         return output_path

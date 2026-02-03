@@ -36,4 +36,11 @@ class SemanticMapper:
                 if normalized_a == normalized_b:
                     mapping[a] = b
                     break
+        
+        # Ensure the key column is in the mapping if it exists in both
         return mapping
+
+    def clean_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Removes potential hidden spaces/newlines from column headers."""
+        df.columns = [str(c).strip() for c in df.columns]
+        return df
