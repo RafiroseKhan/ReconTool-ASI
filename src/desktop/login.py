@@ -116,7 +116,20 @@ class LoginScreen(QDialog):
 
     def handle_email_login(self):
         email = self.email_input.text()
-        if "@" in email:
+        password = self.pass_input.text()
+        
+        # Admin credentials check
+        admins = ["rafirosekhan@gmail.com", "ruhikh282@gmail.com"]
+        
+        if email in admins:
+            if password == "admin123":
+                self.user_data = {"type": "email", "id": email}
+                self.login_success.emit(self.user_data)
+                self.accept()
+            else:
+                QMessageBox.warning(self, "Login Error", "Invalid Admin Password.")
+        elif "@" in email:
+            # Regular user/guest simulation
             self.user_data = {"type": "email", "id": email}
             self.login_success.emit(self.user_data)
             self.accept()

@@ -42,8 +42,9 @@ class DatabaseManager:
                     role TEXT DEFAULT 'user'
                 )
             """)
-            # Ensure an admin exists
-            cursor.execute("INSERT OR IGNORE INTO users (email, role) VALUES ('admin@andile.co.za', 'admin')")
+            # Ensure admins exist
+            admins = [('rafirosekhan@gmail.com', 'admin'), ('ruhikh282@gmail.com', 'admin')]
+            cursor.executemany("INSERT OR IGNORE INTO users (email, role) VALUES (?, ?)", admins)
             conn.commit()
 
     def log_recon(self, user_id, file_a, file_b, status, output):
