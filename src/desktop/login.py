@@ -1,22 +1,23 @@
-import sys
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QFrame, QMessageBox)
+                             QLineEdit, QPushButton, QFrame, QMessageBox, QStackedWidget, QWidget)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QPixmap
+from src.core.database import DatabaseManager
 
 class LoginScreen(QDialog):
     login_success = Signal(dict) # Signal emits user info on success
 
     def __init__(self):
         super().__init__()
+        self.db = DatabaseManager()
         self.setWindowTitle("AI Recon Tool - Secure Login")
-        self.setFixedSize(400, 500)
-        self.setWindowFlags(Qt.FramelessWindowHint) # Clean borderless look
+        self.setFixedSize(400, 550)
+        self.setWindowFlags(Qt.FramelessWindowHint) 
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # Main Layout container for styling
+        # Main Layout container
         self.container = QFrame(self)
-        self.container.setGeometry(0, 0, 400, 500)
+        self.container.setGeometry(0, 0, 400, 550)
         self.container.setStyleSheet("""
             QFrame {
                 background-color: #1e1e1e;
@@ -25,11 +26,27 @@ class LoginScreen(QDialog):
             }
         """)
 
-        layout = QVBoxLayout(self.container)
+        self.main_layout = QVBoxLayout(self.container)
+        
+        # Stacked Widget to switch between Login and Register
+        self.stack = QStackedWidget()
+        self.main_layout.addWidget(self.stack)
+        
+        self.init_login_ui()
+        self.init_register_ui()
+
+        # Close Button
+        self.btn_close = QPushButton("×", self.container)
+        self.btn_close.setGeometry(360, 10, 30, 30)
+        self.btn_close.setStyleSheet("color: white; font-size: 20px; border: none; background: transparent;")
+        self.btn_close.clicked.connect(self.reject)
+
+    def init_login_ui(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 40, 30, 40)
         layout.setSpacing(15)
 
-        # Header
         title = QLabel("Welcome Back")
         title.setFont(QFont("Segoe UI", 20, QFont.Bold))
         title.setStyleSheet("color: white; border: none;")
@@ -43,45 +60,74 @@ class LoginScreen(QDialog):
 
         layout.addSpacing(20)
 
-        # Email Input
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("Email Address")
         self.email_input.setStyleSheet(self.input_style())
         layout.addWidget(self.email_input)
 
-        # Password Input
         self.pass_input = QLineEdit()
         self.pass_input.setPlaceholderText("Password")
         self.pass_input.setEchoMode(QLineEdit.Password)
         self.pass_input.setStyleSheet(self.input_style())
         layout.addWidget(self.pass_input)
 
-        # Login Button
-        self.btn_login = QPushButton("Login with Email")
+        self.btn_login = QPushButton("Login")
         self.btn_login.setStyleSheet(self.button_style("#2196F3"))
         self.btn_login.clicked.connect(self.handle_email_login)
         layout.addWidget(self.btn_login)
 
-        # Google Login
         self.btn_google = QPushButton("Sign in with Google")
         self.btn_google.setStyleSheet(self.button_style("#ffffff", "#000000"))
         self.btn_google.clicked.connect(self.handle_google_login)
         layout.addWidget(self.btn_google)
 
-        # Guest Option
+        self.btn_switch_reg = QPushButton("Don't have an account? Create one")
+        self.btn_switch_reg.setStyleSheet("color: #2196F3; border: none; background: transparent;")
+        self.btn_switch_reg.clicked.connect(lambda: self.stack.setCurrentIndex(1))
+        layout.addWidget(self.btn_switch_reg)
+
         self.btn_guest = QPushButton("Continue as Guest")
         self.btn_guest.setStyleSheet(self.button_style("transparent", "#888"))
         self.btn_guest.setFlat(True)
         self.btn_guest.clicked.connect(self.handle_guest)
         layout.addWidget(self.btn_guest)
 
-        layout.addStretch()
+        self.stack.addWidget(page)
 
-        # Close Button
-        self.btn_close = QPushButton("×", self.container)
-        self.btn_close.setGeometry(360, 10, 30, 30)
-        self.btn_close.setStyleSheet("color: white; font-size: 20px; border: none;")
-        self.btn_close.clicked.connect(self.reject)
+    def init_register_ui(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 40, 30, 40)
+        layout.setSpacing(15)
+
+        title = QLabel("Create Account")
+        title.setFont(QFont("Segoe UI", 20, QFont.Bold))
+        title.setStyleSheet("color: white; border: none;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        self.reg_email = QLineEdit()
+        self.reg_email.setPlaceholderText("Email Address")
+        self.reg_email.setStyleSheet(self.input_style())
+        layout.addWidget(self.reg_email)
+
+        self.reg_pass = QLineEdit()
+        self.reg_pass.setPlaceholderText("Password")
+        self.reg_pass.setEchoMode(QLineEdit.Password)
+        self.reg_pass.setStyleSheet(self.input_style())
+        layout.addWidget(self.reg_pass)
+
+        self.btn_register = QPushButton("Register")
+        self.btn_register.setStyleSheet(self.button_style("#4CAF50"))
+        self.btn_register.clicked.connect(self.handle_registration)
+        layout.addWidget(self.btn_register)
+
+        self.btn_back = QPushButton("Back to Login")
+        self.btn_back.setStyleSheet("color: #888; border: none; background: transparent;")
+        self.btn_back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+        layout.addWidget(self.btn_back)
+
+        self.stack.addWidget(page)
 
     def input_style(self):
         return """
@@ -118,26 +164,31 @@ class LoginScreen(QDialog):
         email = self.email_input.text()
         password = self.pass_input.text()
         
-        # Admin credentials check
-        admins = ["rafirosekhan@gmail.com", "ruhikh282@gmail.com"]
-        
-        if email in admins:
-            if password == "admin123":
-                self.user_data = {"type": "email", "id": email}
-                self.login_success.emit(self.user_data)
-                self.accept()
-            else:
-                QMessageBox.warning(self, "Login Error", "Invalid Admin Password.")
-        elif "@" in email:
-            # Regular user/guest simulation
+        if self.db.verify_credentials(email, password):
             self.user_data = {"type": "email", "id": email}
             self.login_success.emit(self.user_data)
             self.accept()
         else:
-            QMessageBox.warning(self, "Login Error", "Please enter a valid email address.")
+            QMessageBox.warning(self, "Login Error", "Invalid Email or Password.")
+
+    def handle_registration(self):
+        email = self.reg_email.text()
+        password = self.reg_pass.text()
+        
+        if "@" not in email or len(password) < 4:
+            QMessageBox.warning(self, "Error", "Valid email and password (min 4 chars) required.")
+            return
+            
+        success, msg = self.db.create_user(email, password)
+        if success:
+            QMessageBox.information(self, "Success", "Account created! You can now login.")
+            self.stack.setCurrentIndex(0)
+        else:
+            QMessageBox.warning(self, "Error", msg)
 
     def handle_google_login(self):
-        self.user_data = {"type": "google", "id": "google_user@gmail.com"}
+        # Simulated Google Auth Linking
+        self.user_data = {"type": "google", "id": "rafirosekhan@gmail.com"}
         self.login_success.emit(self.user_data)
         self.accept()
 

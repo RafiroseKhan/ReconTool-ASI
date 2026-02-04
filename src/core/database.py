@@ -35,16 +35,20 @@ class DatabaseManager:
                     ip_address TEXT
                 )
             """)
-            # Simple User Table for Admin check
+            # User Table: Handles auth and roles
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     email TEXT PRIMARY KEY,
+                    password TEXT,
                     role TEXT DEFAULT 'user'
                 )
             """)
-            # Ensure admins exist
-            admins = [('rafirosekhan@gmail.com', 'admin'), ('ruhikh282@gmail.com', 'admin')]
-            cursor.executemany("INSERT OR IGNORE INTO users (email, role) VALUES (?, ?)", admins)
+            # Ensure admins exist with passwords
+            admins = [
+                ('rafirosekhan@gmail.com', 'admin123', 'admin'), 
+                ('ruhikh282@gmail.com', 'admin123', 'admin')
+            ]
+            cursor.executemany("INSERT OR IGNORE INTO users (email, password, role) VALUES (?, ?, ?)", admins)
             conn.commit()
 
     def log_recon(self, user_id, file_a, file_b, status, output):
@@ -56,6 +60,25 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("INSERT INTO audit_logs (user_id, action, timestamp, details) VALUES (?, ?, ?, ?)",
                          (user_id, action, datetime.datetime.now(), details))
+
+    def verify_credentials(self, email, password):
+        """Verifies if user exists and password matches."""
+        with sqlite3.connect(self.db_path) as conn:
+            res = conn.execute("SELECT password FROM users WHERE email = ?", (email,)).fetchone()
+            if res and res[0] == password:
+                return True
+            return False
+
+    def create_user(self, email, password, role='user'):
+        """Registers a new user."""
+        with sqlite3.connect(self.db_path) as conn:
+            try:
+                conn.execute("INSERT INTO users (email, password, role) VALUES (?, ?, ?)", 
+                             (email, password, role))
+                conn.commit()
+                return True, "User created successfully"
+            except sqlite3.IntegrityError:
+                return False, "User already exists"
 
     def is_admin(self, email):
         with sqlite3.connect(self.db_path) as conn:

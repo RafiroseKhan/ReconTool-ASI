@@ -42,8 +42,15 @@ class ReconApp(QMainWindow):
             top_bar.addWidget(self.btn_admin)
         
         top_bar.addStretch()
-        user_label = QLabel(f"👤 {self.user_info['id']}")
-        top_bar.addWidget(user_label)
+        
+        # User Profile Display with Logout Dropdown
+        self.user_menu = QComboBox()
+        self.user_menu.addItem(f"👤 {self.user_info['id']}")
+        self.user_menu.addItem("Logout")
+        self.user_menu.setFixedWidth(200)
+        self.user_menu.activated.connect(self.handle_user_menu)
+        top_bar.addWidget(self.user_menu)
+        
         main_layout.addLayout(top_bar)
 
         # 1. File Management Section
@@ -118,6 +125,12 @@ class ReconApp(QMainWindow):
     def open_admin_portal(self):
         portal = AdminPortal(self.db)
         portal.exec()
+
+    def handle_user_menu(self, index):
+        if self.user_menu.itemText(index) == "Logout":
+            self.db.log_audit(self.user_info['id'], "LOGOUT", "User logged out")
+            # Restart application to show login screen
+            os.execl(sys.executable, sys.executable, *sys.argv)
 
     def select_files(self, group):
         files, _ = QFileDialog.getOpenFileNames(self, f"Select Files for Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
