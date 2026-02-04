@@ -1,0 +1,4 @@
+Trade_Id,External Ref,Product Type,Quantity,Price,Notional,Counter Party,Currency
+1,FO_Murex_1,Cash,100,105.0,10500,CITI,EUR
+2,FO_Murex_2,Equity,200,50.0,10000,GS,USD
+3,FO_Murex_3,FX,300,1.1,330,MS,GBP

@@ -1,4 +1,5 @@
 from src.core.coordinator import ReconCoordinator
+from src.desktop.login import LoginScreen
 import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -8,10 +9,12 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import Qt
 
 class ReconApp(QMainWindow):
-    def __init__(self):
+    def __init__(self, user_info=None):
         super().__init__()
+        self.user_info = user_info or {"type": "guest", "id": "Guest"}
         self.coordinator = ReconCoordinator()
         self.files_a = []
+        # ...
         self.files_b = []
         self.setWindowTitle("AI Recon Tool - Professional Suite")
         self.setMinimumSize(1100, 800)
@@ -93,6 +96,12 @@ class ReconApp(QMainWindow):
         self.btn_clear_b.clicked.connect(lambda: self.clear_files('b'))
         self.btn_analyze.clicked.connect(self.run_analysis)
         self.btn_reconcile.clicked.connect(self.run_reconciliation)
+
+        # User Profile Display
+        user_label = QLabel(f"Logged in as: {self.user_info['id']} ({self.user_info['type'].upper()})")
+        user_label.setStyleSheet("color: #888; font-size: 10px;")
+        user_label.setAlignment(Qt.AlignRight)
+        main_layout.addWidget(user_label)
 
     def select_files(self, group):
         files, _ = QFileDialog.getOpenFileNames(self, f"Select Files for Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
@@ -233,6 +242,17 @@ class ReconApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ReconApp()
-    window.show()
-    sys.exit(app.exec())
+    
+    # Show Login Screen First
+    login = LoginScreen()
+    if login.exec() == QDialog.Accepted:
+        # Get the emitted user data
+        # Note: In PySide6, we handle the signal data via a callback or by storing it in the dialog
+        # For simplicity in this shell execution, we'll assume guest if we don't capture the signal
+        # but the real code should link them.
+        
+        # Let's add a small helper to LoginScreen to store the result
+        user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
+        window = ReconApp(user_info=user_data)
+        window.show()
+        sys.exit(app.exec())

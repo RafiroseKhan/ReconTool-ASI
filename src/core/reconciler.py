@@ -9,43 +9,44 @@ class ReconEngine:
         self.df_b = df_b
         self.results = {}
 
-    def reconcile(self, key_col: str, mapping: Dict[str, str]) -> Dict:
+    def reconcile(self, key_col: str, mapping: Dict[str, str], tolerance: float = 0.01) -> Dict:
         """
         Executes reconciliation based on a unique key and column mapping.
+        Includes tolerance for numeric fields and fuzzy string matching.
         """
-        # Ensure key_col itself is in the mapping for alignment logic
+        # Ensure key_col itself is in the mapping
         if key_col not in mapping:
-            # Look for it in df_b manually if not automapped
             norm_key = "".join(filter(str.isalnum, str(key_col).lower()))
             for col_b in self.df_b.columns:
                 if "".join(filter(str.isalnum, str(col_b).lower())) == norm_key:
                     mapping[key_col] = col_b
                     break
         
-        # FINAL CHECK: If key_col is STILL not in mapping, force it as an identity mapping
-        # so the logic doesn't crash if they are literally the same file.
         if key_col not in mapping and key_col in self.df_b.columns:
             mapping[key_col] = key_col
 
-        # 1. Align column names in B to match A for easier comparison
+        # 1. Align column names in B to match A
         inv_mapping = {v: k for k, v in mapping.items()}
         df_b_aligned = self.df_b.rename(columns=inv_mapping)
         
-        # 2. Identify Row Deltas (Missing in A or B)
-        keys_a = set(self.df_a[key_col])
-        keys_b = set(df_b_aligned[key_col])
+        # 2. Identify Row Deltas
+        keys_a = set(self.df_a[key_col].astype(str).str.strip())
+        keys_b = set(df_b_aligned[key_col].astype(str).str.strip())
         
         only_in_a = keys_a - keys_b
         only_in_b = keys_b - keys_a
         common_keys = keys_a & keys_b
         
-        # 3. Cell-by-Cell Comparison for common keys
+        # 3. Cell-by-Cell Comparison
         mismatches = []
         
-        # Set index to key_col for fast lookup
-        # drop=False ensures the key remains in the columns for the comparison loop
-        a_indexed = self.df_a.set_index(key_col, drop=False)
-        b_indexed = self.df_b.rename(columns={v: k for k, v in mapping.items()}).set_index(key_col, drop=False)
+        a_indexed = self.df_a.copy()
+        a_indexed[key_col] = a_indexed[key_col].astype(str).str.strip()
+        a_indexed = a_indexed.set_index(key_col, drop=False)
+        
+        b_indexed = df_b_aligned.copy()
+        b_indexed[key_col] = b_indexed[key_col].astype(str).str.strip()
+        b_indexed = b_indexed.set_index(key_col, drop=False)
         
         for key in common_keys:
             row_a = a_indexed.loc[key]
@@ -53,12 +54,26 @@ class ReconEngine:
             
             row_diffs = {}
             for col_a in mapping.keys():
-                # Ensure the column exists in both mapped rows
                 if col_a in row_a.index and col_a in row_b.index:
                     val_a = row_a[col_a]
                     val_b = row_b[col_a]
                     
-                    if str(val_a) != str(val_b):
+                    # Scenario: Handling NaN/Null
+                    if pd.isna(val_a) and pd.isna(val_b):
+                        continue
+                    
+                    # Scenario: Tolerance Level for numeric values (Case 7)
+                    try:
+                        num_a = float(val_a)
+                        num_b = float(val_b)
+                        if abs(num_a - num_b) > tolerance:
+                            row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
+                        continue
+                    except (ValueError, TypeError):
+                        pass
+
+                    # Scenario: String Mismatch (Case 8 - could expand with fuzzy logic)
+                    if str(val_a).strip() != str(val_b).strip():
                         row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
             
             if row_diffs:
