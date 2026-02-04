@@ -187,13 +187,18 @@ class LoginScreen(QDialog):
             QMessageBox.warning(self, "Error", msg)
 
     def handle_google_login(self):
-        # SIMULATION: In a real desktop app, this would open a browser to OAuth
-        # Since we are in a testing environment, we will link it to your actual admin email
+        # 1. Open the real Google Login page in the user's default browser
+        import webbrowser
+        google_oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&response_type=code&scope=email%20profile&redirect_uri=http://localhost:8080"
+        webbrowser.open(google_oauth_url)
+        
+        # 2. Simulation for development:
+        # In a full production app, we would start a local listener to capture the 'code' 
+        # from the redirect. For now, we simulate the successful return of your profile.
         self.user_data = {"type": "google", "id": "rafirosekhan@gmail.com"}
         
         # Verify if this user exists in DB, if not create them
         if not self.db.is_admin(self.user_data['id']):
-            # If not an admin, check if they exist at all
             with self.db.connect() as conn:
                 res = conn.execute("SELECT email FROM users WHERE email = ?", (self.user_data['id'],)).fetchone()
                 if not res:
