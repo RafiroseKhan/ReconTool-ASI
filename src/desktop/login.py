@@ -187,8 +187,18 @@ class LoginScreen(QDialog):
             QMessageBox.warning(self, "Error", msg)
 
     def handle_google_login(self):
-        # Simulated Google Auth Linking
+        # SIMULATION: In a real desktop app, this would open a browser to OAuth
+        # Since we are in a testing environment, we will link it to your actual admin email
         self.user_data = {"type": "google", "id": "rafirosekhan@gmail.com"}
+        
+        # Verify if this user exists in DB, if not create them
+        if not self.db.is_admin(self.user_data['id']):
+            # If not an admin, check if they exist at all
+            with self.db.connect() as conn:
+                res = conn.execute("SELECT email FROM users WHERE email = ?", (self.user_data['id'],)).fetchone()
+                if not res:
+                    self.db.create_user(self.user_data['id'], "google_auth_placeholder")
+
         self.login_success.emit(self.user_data)
         self.accept()
 

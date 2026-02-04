@@ -129,8 +129,8 @@ class ReconApp(QMainWindow):
     def handle_user_menu(self, index):
         if self.user_menu.itemText(index) == "Logout":
             self.db.log_audit(self.user_info['id'], "LOGOUT", "User logged out")
-            # Restart application to show login screen
-            os.execl(sys.executable, sys.executable, *sys.argv)
+            self.is_logging_out = True
+            self.close() 
 
     def select_files(self, group):
         files, _ = QFileDialog.getOpenFileNames(self, f"Select Files for Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
@@ -277,9 +277,18 @@ class ReconApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    login = LoginScreen()
-    if login.exec() == QDialog.Accepted:
-        user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
-        window = ReconApp(user_info=user_data)
-        window.show()
-        sys.exit(app.exec())
+    
+    while True:
+        login = LoginScreen()
+        if login.exec() == QDialog.Accepted:
+            user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
+            window = ReconApp(user_info=user_data)
+            window.show()
+            app.exec() # Wait for window to close
+            
+            # Check if we are logging out or exiting
+            if not getattr(window, 'is_logging_out', False):
+                break
+        else:
+            break
+    sys.exit()

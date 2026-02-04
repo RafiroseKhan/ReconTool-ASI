@@ -69,6 +69,10 @@ class DatabaseManager:
             conn.execute("INSERT INTO audit_logs (user_id, action, timestamp, details) VALUES (?, ?, ?, ?)",
                          (user_id, action, datetime.datetime.now(), details))
 
+    def connect(self):
+        """Returns a connection to the database."""
+        return sqlite3.connect(self.db_path)
+
     def verify_credentials(self, email, password):
         """Verifies if user exists and password matches."""
         with sqlite3.connect(self.db_path) as conn:
