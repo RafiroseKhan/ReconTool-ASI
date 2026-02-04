@@ -12,6 +12,22 @@ class DatabaseManager:
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            
+            # 1. Create tables if they don't exist
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    email TEXT PRIMARY KEY,
+                    password TEXT,
+                    role TEXT DEFAULT 'user'
+                )
+            """)
+            
+            # Migration check: If table exists but missing password column
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if "password" not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN password TEXT")
+
             # User History: Tracks recon runs
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS history (
@@ -33,14 +49,6 @@ class DatabaseManager:
                     timestamp DATETIME,
                     details TEXT,
                     ip_address TEXT
-                )
-            """)
-            # User Table: Handles auth and roles
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    email TEXT PRIMARY KEY,
-                    password TEXT,
-                    role TEXT DEFAULT 'user'
                 )
             """)
             # Ensure admins exist with passwords
