@@ -1,20 +1,26 @@
 from src.core.coordinator import ReconCoordinator
 from src.desktop.login import LoginScreen
+from src.desktop.admin import AdminPortal
+from src.core.database import DatabaseManager
 import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-                             QComboBox, QGroupBox, QListWidget)
+                             QComboBox, QGroupBox, QListWidget, QDialog)
 from PySide6.QtCore import Qt
 
 class ReconApp(QMainWindow):
     def __init__(self, user_info=None):
         super().__init__()
         self.user_info = user_info or {"type": "guest", "id": "Guest"}
+        self.db = DatabaseManager()
         self.coordinator = ReconCoordinator()
+        
+        # Log session start
+        self.db.log_audit(self.user_info['id'], "SESSION_START", f"User logged in via {self.user_info['type']}")
+        
         self.files_a = []
-        # ...
         self.files_b = []
         self.setWindowTitle("AI Recon Tool - Professional Suite")
         self.setMinimumSize(1100, 800)
@@ -26,7 +32,19 @@ class ReconApp(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        # ...
+
+        # Top Bar for Admin & Profile
+        top_bar = QHBoxLayout()
+        if self.db.is_admin(self.user_info['id']):
+            self.btn_admin = QPushButton("🛡️ Admin Portal")
+            self.btn_admin.setStyleSheet("background-color: #f44336; color: white; font-weight: bold; padding: 5px 15px;")
+            self.btn_admin.clicked.connect(self.open_admin_portal)
+            top_bar.addWidget(self.btn_admin)
+        
+        top_bar.addStretch()
+        user_label = QLabel(f"👤 {self.user_info['id']}")
+        top_bar.addWidget(user_label)
+        main_layout.addLayout(top_bar)
 
         # 1. File Management Section
         files_group = QGroupBox("1. Select Batches of Files")
@@ -97,11 +115,9 @@ class ReconApp(QMainWindow):
         self.btn_analyze.clicked.connect(self.run_analysis)
         self.btn_reconcile.clicked.connect(self.run_reconciliation)
 
-        # User Profile Display
-        user_label = QLabel(f"Logged in as: {self.user_info['id']} ({self.user_info['type'].upper()})")
-        user_label.setStyleSheet("color: #888; font-size: 10px;")
-        user_label.setAlignment(Qt.AlignRight)
-        main_layout.addWidget(user_label)
+    def open_admin_portal(self):
+        portal = AdminPortal(self.db)
+        portal.exec()
 
     def select_files(self, group):
         files, _ = QFileDialog.getOpenFileNames(self, f"Select Files for Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
@@ -142,6 +158,7 @@ class ReconApp(QMainWindow):
             self.update_mapping_table(mapping, df_b.columns.tolist())
             
             QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings using the dropdowns.")
+            self.db.log_audit(self.user_info['id'], "FILE_ANALYSIS", f"Analyzed {os.path.basename(self.files_a[0])}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Analysis failed: {str(e)}")
 
@@ -188,8 +205,13 @@ class ReconApp(QMainWindow):
             output_path = "batch_recon_output.xlsx"
             self.coordinator.run_full_recon(self.files_a[0], self.files_b[0], key_col=key_col, output_path=output_path)
             
+            # Persist to History Database
+            self.db.log_recon(self.user_info['id'], self.files_a[0], self.files_b[0], "SUCCESS", output_path)
+            self.db.log_audit(self.user_info['id'], "RECON_RUN", f"Ran recon for {os.path.basename(self.files_a[0])}")
+            
             QMessageBox.information(self, "Success", f"Reconciliation Complete!\n\nKey Used: {key_col}\nOutput: {os.path.abspath(output_path)}")
         except Exception as e:
+            self.db.log_recon(self.user_info['id'], self.files_a[0], self.files_b[0], "FAILED", str(e))
             QMessageBox.critical(self, "Error", f"Reconciliation failed: {str(e)}")
 
     def apply_dark_theme(self):
@@ -242,16 +264,8 @@ class ReconApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Show Login Screen First
     login = LoginScreen()
     if login.exec() == QDialog.Accepted:
-        # Get the emitted user data
-        # Note: In PySide6, we handle the signal data via a callback or by storing it in the dialog
-        # For simplicity in this shell execution, we'll assume guest if we don't capture the signal
-        # but the real code should link them.
-        
-        # Let's add a small helper to LoginScreen to store the result
         user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
         window = ReconApp(user_info=user_data)
         window.show()
