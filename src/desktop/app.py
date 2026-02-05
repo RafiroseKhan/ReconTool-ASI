@@ -43,6 +43,26 @@ class ReconApp(QMainWindow):
         
         top_bar.addStretch()
         
+        # Info Button
+        self.btn_info = QPushButton("ℹ")
+        self.btn_info.setFixedSize(30, 30)
+        self.btn_info.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                border-radius: 15px;
+                color: #2196F3;
+                font-weight: bold;
+                font-size: 16px;
+                border: 1px solid #2196F3;
+            }
+            QPushButton:hover {
+                background-color: #2196F3;
+                color: white;
+            }
+        """)
+        self.btn_info.clicked.connect(self.show_info)
+        top_bar.addWidget(self.btn_info)
+
         # User Profile Display with Logout Dropdown
         self.user_menu = QComboBox()
         self.user_menu.addItem(f"👤 {self.user_info['id']}")
@@ -125,6 +145,49 @@ class ReconApp(QMainWindow):
     def open_admin_portal(self):
         portal = AdminPortal(self.db)
         portal.exec()
+
+    def show_info(self):
+        info_text = """
+        <div style='font-family: Segoe UI, Arial;'>
+            <h2 style='color: #2196F3;'>AI Recon Tool - Professional Suite</h2>
+            <p><b>Version:</b> 1.0.0</p>
+            <p>A multi-format reconciliation engine supporting Excel, CSV, and Scanned PDFs with AI-powered column mapping.</p>
+            <hr style='border: 0; border-top: 1px solid #3d3d3d;'>
+            <p style='font-size: 14px;'><b>Created By:</b></p>
+            <ul style='list-style: none; padding-left: 0;'>
+                <li style='margin-bottom: 10px;'>
+                    <b>Rafirose Khan Shah</b><br>
+                    <a href='mailto:rafirosekhan@gmail.com' style='color: #2196F3; text-decoration: none;'>rafirosekhan@gmail.com</a>
+                </li>
+                <li>
+                    <b>Ruhi Khanna</b><br>
+                    <a href='mailto:ruhikh282@gmail.com' style='color: #2196F3; text-decoration: none;'>ruhikh282@gmail.com</a>
+                </li>
+            </ul>
+            <p style='font-style: italic; color: #888; margin-top: 20px;'>Building the future of financial data reconciliation.</p>
+        </div>
+        """
+        msg = QMessageBox(self)
+        msg.setWindowTitle("About Application")
+        msg.setTextFormat(Qt.RichText)
+        msg.setText(info_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #1e1e1e;
+            }
+            QLabel {
+                min-width: 450px;
+                color: #e0e0e0;
+            }
+            QPushButton {
+                background-color: #333333;
+                color: #e0e0e0;
+                padding: 5px 15px;
+                border: 1px solid #555;
+            }
+        """)
+        msg.exec()
 
     def handle_user_menu(self, index):
         if self.user_menu.itemText(index) == "Logout":
