@@ -7,8 +7,53 @@ import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-                             QComboBox, QGroupBox, QListWidget, QDialog)
-from PySide6.QtCore import Qt
+                             QComboBox, QGroupBox, QListWidget, QDialog, QProgressBar)
+from PySide6.QtCore import Qt, QThread, Signal
+
+class ReconWorker(QThread):
+    progress = Signal(int)
+    status = Signal(str)
+    finished = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, coordinator, files_a, files_b, key_col, mapping, db, user_id):
+        super().__init__()
+        self.coordinator = coordinator
+        self.files_a = files_a
+        self.files_b = files_b
+        self.key_col = key_col
+        self.mapping = mapping
+        self.db = db
+        self.user_id = user_id
+
+    def run(self):
+        results = []
+        total = len(self.files_a)
+        try:
+            for i, file_a in enumerate(self.files_a):
+                # Simple matching by index for this batch mode
+                if i < len(self.files_b):
+                    file_b = self.files_b[i]
+                    self.status.emit(f"Processing: {os.path.basename(file_a)} vs {os.path.basename(file_b)}...")
+                    
+                    output_path = f"Recon_Report_{os.path.basename(file_a)}.xlsx"
+                    self.coordinator.run_full_recon(
+                        file_a, 
+                        file_b, 
+                        key_col=self.key_col, 
+                        mapping=self.mapping, 
+                        output_path=output_path
+                    )
+                    
+                    self.db.log_recon(self.user_id, file_a, file_b, "SUCCESS", output_path)
+                    results.append(output_path)
+                    
+                progress_val = int(((i + 1) / total) * 100)
+                self.progress.emit(progress_val)
+            
+            self.finished.emit(results)
+        except Exception as e:
+            self.error.emit(str(e))
 
 class ReconApp(QMainWindow):
     def __init__(self, user_info=None):
@@ -128,7 +173,28 @@ class ReconApp(QMainWindow):
         main_layout.addWidget(config_group)
 
         # 3. Execution Section
-        exec_layout = QHBoxLayout()
+        exec_layout = QVBoxLayout()
+        
+        self.progress_label = QLabel("Ready")
+        self.progress_label.setAlignment(Qt.AlignCenter)
+        self.progress_label.hide()
+        exec_layout.addWidget(self.progress_label)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #3d3d3d;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+            }
+        """)
+        self.progress_bar.hide()
+        exec_layout.addWidget(self.progress_bar)
+
         self.btn_reconcile = QPushButton("Run Full Batch Reconciliation")
         self.btn_reconcile.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 15px; font-size: 14px;")
         exec_layout.addWidget(self.btn_reconcile)
@@ -268,33 +334,56 @@ class ReconApp(QMainWindow):
             QMessageBox.warning(self, "Error", "Please run analysis and select a primary key first.")
             return
 
-        try:
-            # Get current mapping from dropdown widgets in the table
-            mapping = {}
-            for row in range(self.mapping_table.rowCount()):
-                item_a = self.mapping_table.item(row, 0)
-                combo_b = self.mapping_table.cellWidget(row, 1)
-                if item_a and combo_b:
-                    mapping[item_a.text()] = combo_b.currentText()
+        # Get current mapping from dropdown widgets in the table
+        mapping = {}
+        for row in range(self.mapping_table.rowCount()):
+            item_a = self.mapping_table.item(row, 0)
+            combo_b = self.mapping_table.cellWidget(row, 1)
+            if item_a and combo_b:
+                mapping[item_a.text()] = combo_b.currentText()
 
-            # For Phase 1 Batch, we process the first pair
-            output_path = f"Recon_Report_{os.path.basename(self.files_a[0])}.xlsx"
-            self.coordinator.run_full_recon(
-                self.files_a[0], 
-                self.files_b[0], 
-                key_col=key_col, 
-                mapping=mapping, 
-                output_path=output_path
-            )
-            
-            # Persist to History Database
-            self.db.log_recon(self.user_info['id'], self.files_a[0], self.files_b[0], "SUCCESS", output_path)
-            self.db.log_audit(self.user_info['id'], "RECON_RUN", f"Ran recon for {os.path.basename(self.files_a[0])}")
-            
-            QMessageBox.information(self, "Success", f"Reconciliation Complete!\n\nKey Used: {key_col}\nOutput: {os.path.abspath(output_path)}")
-        except Exception as e:
-            self.db.log_recon(self.user_info['id'], self.files_a[0], self.files_b[0], "FAILED", str(e))
-            QMessageBox.critical(self, "Error", f"Reconciliation failed: {str(e)}")
+        # UI Setup for Progress
+        self.btn_reconcile.setEnabled(False)
+        self.btn_analyze.setEnabled(False)
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
+        self.progress_label.show()
+
+        # Initialize Worker Thread
+        self.worker = ReconWorker(
+            self.coordinator, 
+            self.files_a, 
+            self.files_b, 
+            key_col, 
+            mapping, 
+            self.db, 
+            self.user_info['id']
+        )
+        
+        # Connect signals
+        self.worker.progress.connect(self.progress_bar.setValue)
+        self.worker.status.connect(self.progress_label.setText)
+        self.worker.error.connect(self.handle_recon_error)
+        self.worker.finished.connect(self.handle_recon_finished)
+        
+        # Start
+        self.worker.start()
+
+    def handle_recon_error(self, error_msg):
+        self.reset_ui_after_run()
+        QMessageBox.critical(self, "Error", f"Reconciliation failed: {error_msg}")
+
+    def handle_recon_finished(self, results):
+        self.reset_ui_after_run()
+        self.db.log_audit(self.user_info['id'], "RECON_BATCH_FINISH", f"Processed {len(results)} pairs")
+        QMessageBox.information(self, "Success", f"Batch Reconciliation Complete!\n\nProcessed {len(results)} pairs.\nCheck the project folder for the output files.")
+
+    def reset_ui_after_run(self):
+        self.btn_reconcile.setEnabled(True)
+        self.btn_analyze.setEnabled(True)
+        self.progress_bar.hide()
+        self.progress_label.hide()
+        self.progress_label.setText("Ready")
 
     def apply_dark_theme(self):
         self.setStyleSheet("""
