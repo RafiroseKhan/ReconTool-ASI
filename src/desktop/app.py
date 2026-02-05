@@ -278,8 +278,14 @@ class ReconApp(QMainWindow):
                     mapping[item_a.text()] = combo_b.currentText()
 
             # For Phase 1 Batch, we process the first pair
-            output_path = "batch_recon_output.xlsx"
-            self.coordinator.run_full_recon(self.files_a[0], self.files_b[0], key_col=key_col, output_path=output_path)
+            output_path = f"Recon_Report_{os.path.basename(self.files_a[0])}.xlsx"
+            self.coordinator.run_full_recon(
+                self.files_a[0], 
+                self.files_b[0], 
+                key_col=key_col, 
+                mapping=mapping, 
+                output_path=output_path
+            )
             
             # Persist to History Database
             self.db.log_recon(self.user_info['id'], self.files_a[0], self.files_b[0], "SUCCESS", output_path)
