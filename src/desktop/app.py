@@ -4,19 +4,20 @@ from src.desktop.admin import AdminPortal
 from src.core.database import DatabaseManager
 import sys
 import os
+import pandas as pd
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
                              QComboBox, QGroupBox, QListWidget, QDialog, QProgressBar,
-                             QTabWidget, QSplitter)
+                             QTabWidget, QSplitter, QFrame)
 from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QColor, QIcon, QPixmap
 
 class ComparisonView(QDialog):
     def __init__(self, df_a, df_b, mapping, key_col=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Side-by-Side Comparison (Beyond Compare Style)")
-        self.setMinimumSize(1200, 700)
+        self.setWindowTitle("Side-by-Side Comparison")
+        self.setMinimumSize(1200, 750)
         layout = QVBoxLayout(self)
         
         # Comparison logic: Align B to A based on mapping
@@ -24,21 +25,14 @@ class ComparisonView(QDialog):
         df_b_aligned = df_b.rename(columns=inv_mapping)
         
         splitter = QSplitter(Qt.Horizontal)
-        
-        # Table A
         self.table_a = QTableWidget()
-        # Table B
         self.table_b = QTableWidget()
         
         self.populate_and_compare(df_a, df_b_aligned, mapping, key_col)
         
         # Synchronize Scrolling
-        self.table_a.verticalScrollBar().valueChanged.connect(
-            self.table_b.verticalScrollBar().setValue
-        )
-        self.table_b.verticalScrollBar().valueChanged.connect(
-            self.table_a.verticalScrollBar().setValue
-        )
+        self.table_a.verticalScrollBar().valueChanged.connect(self.table_b.verticalScrollBar().setValue)
+        self.table_b.verticalScrollBar().valueChanged.connect(self.table_a.verticalScrollBar().setValue)
         
         splitter.addWidget(self.table_a)
         splitter.addWidget(self.table_b)
@@ -47,7 +41,6 @@ class ComparisonView(QDialog):
     def populate_and_compare(self, df_a, df_b, mapping, key_col):
         rows = max(len(df_a), len(df_b))
         cols = len(df_a.columns)
-        
         for table in [self.table_a, self.table_b]:
             table.setRowCount(rows)
             table.setColumnCount(cols)
@@ -58,47 +51,34 @@ class ComparisonView(QDialog):
         if key_col and key_col in df_a.columns and key_col in df_b.columns:
             df_b_idx = df_b.set_index(key_col)
         else:
-            df_b_idx = df_b # Fallback to index matching
+            df_b_idx = df_b
 
         for i in range(len(df_a)):
             row_a = df_a.iloc[i]
             key_val = row_a[key_col] if key_col else i
-            
             try:
                 if key_col:
                     row_b = df_b_idx.loc[key_val]
-                    # Handle multiple matches
                     if isinstance(row_b, pd.DataFrame): row_b = row_b.iloc[0]
                 else:
                     row_b = df_b.iloc[i]
                 found_b = True
-            except:
-                found_b = False
+            except: found_b = False
 
             for j, col in enumerate(df_a.columns):
                 val_a = str(row_a[col])
                 item_a = QTableWidgetItem(val_a)
-                
                 if not found_b:
-                    # Red for no match in B
-                    item_a.setBackground(QColor("#5a1d1d")) # Dark Red
+                    item_a.setBackground(QColor("#5a1d1d"))
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
                 else:
                     val_b = str(row_b[col]) if col in row_b else ""
                     item_b = QTableWidgetItem(val_b)
-                    
-                    if val_a == val_b:
-                        # Green for match
-                        bg = QColor("#1e3a1e") # Dark Green
-                    else:
-                        # Yellow for partial (mismatching content)
-                        bg = QColor("#5a5a1d") # Dark Yellow
-                    
-                    item_a.setBackground(bg)
-                    item_b.setBackground(bg)
-                    self.table_a.setItem(i, j, item_a)
-                    self.table_b.setItem(i, j, item_b)
+                    if val_a == val_b: bg = QColor("#1e3a1e")
+                    else: bg = QColor("#5a5a1d")
+                    item_a.setBackground(bg); item_b.setBackground(bg)
+                    self.table_a.setItem(i, j, item_a); self.table_b.setItem(i, j, item_b)
 
 class ReconWorker(QThread):
     progress = Signal(int)
@@ -109,12 +89,9 @@ class ReconWorker(QThread):
     def __init__(self, coordinator, files_a, files_b, key_col, mapping, db, user_id):
         super().__init__()
         self.coordinator = coordinator
-        self.files_a = files_a
-        self.files_b = files_b
-        self.key_col = key_col
-        self.mapping = mapping
-        self.db = db
-        self.user_id = user_id
+        self.files_a = files_a; self.files_b = files_b
+        self.key_col = key_col; self.mapping = mapping
+        self.db = db; self.user_id = user_id
 
     def run(self):
         results = []
@@ -128,25 +105,19 @@ class ReconWorker(QThread):
                     self.coordinator.run_full_recon(file_a, file_b, key_col=self.key_col, mapping=self.mapping, output_path=output_path)
                     self.db.log_recon(self.user_id, file_a, file_b, "SUCCESS", output_path)
                     results.append(output_path)
-                progress_val = int(((i + 1) / total) * 100)
-                self.progress.emit(progress_val)
+                self.progress.emit(int(((i + 1) / total) * 100))
             self.finished.emit(results)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception as e: self.error.emit(str(e))
 
 class ReconApp(QMainWindow):
     def __init__(self, user_info=None):
         super().__init__()
         self.user_info = user_info or {"type": "guest", "id": "Guest"}
-        self.db = DatabaseManager()
-        self.coordinator = ReconCoordinator()
+        self.db = DatabaseManager(); self.coordinator = ReconCoordinator()
         self.is_dark_mode = True
-        
-        self.files_a = []
-        self.files_b = []
+        self.files_a = []; self.files_b = []
         self.setWindowTitle("AI Recon Tool - Professional Suite")
-        self.setMinimumSize(1100, 800)
-        
+        self.setMinimumSize(1200, 850)
         self.init_ui()
         self.apply_theme()
 
@@ -154,27 +125,27 @@ class ReconApp(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
         # Top Bar
         top_bar = QHBoxLayout()
-        
-        # Logo placeholder or I button
         self.btn_info = QPushButton("ℹ")
         self.btn_info.setFixedSize(35, 35)
+        self.btn_info.setCursor(Qt.PointingHandCursor)
         self.btn_info.clicked.connect(self.show_info)
         top_bar.addWidget(self.btn_info)
 
         if self.db.is_admin(self.user_info['id']):
             self.btn_admin = QPushButton("🛡️ Admin")
+            self.btn_admin.setFixedWidth(100)
             self.btn_admin.clicked.connect(self.open_admin_portal)
             top_bar.addWidget(self.btn_admin)
         
         top_bar.addStretch()
 
-        # Settings Section (Theme Toggle)
         self.btn_theme = QPushButton("🌙" if self.is_dark_mode else "☀️")
         self.btn_theme.setFixedSize(40, 35)
-        self.btn_theme.setToolTip("Toggle Light/Dark Mode")
         self.btn_theme.clicked.connect(self.toggle_theme)
         top_bar.addWidget(self.btn_theme)
 
@@ -184,16 +155,26 @@ class ReconApp(QMainWindow):
         self.user_menu.setFixedWidth(150)
         self.user_menu.activated.connect(self.handle_user_menu)
         top_bar.addWidget(self.user_menu)
-        
         main_layout.addLayout(top_bar)
 
         # 1. File Selection
-        files_group = QGroupBox("1. Select Batches of Files")
+        files_group = QGroupBox("1. Select Batch Files")
+        files_group.setObjectName("FileGroup")
         files_layout = QHBoxLayout()
-        vbox_a = QVBoxLayout(); self.list_a = QListWidget(); self.btn_add_a = QPushButton("Add Group A")
+        files_layout.setContentsMargins(15, 25, 15, 15) # Top margin for title spacing
+        
+        vbox_a = QVBoxLayout()
+        self.btn_add_a = QPushButton("Add Group A")
+        self.btn_add_a.setFixedWidth(150)
+        self.list_a = QListWidget()
         vbox_a.addWidget(self.btn_add_a); vbox_a.addWidget(self.list_a)
-        vbox_b = QVBoxLayout(); self.list_b = QListWidget(); self.btn_add_b = QPushButton("Add Group B")
+        
+        vbox_b = QVBoxLayout()
+        self.btn_add_b = QPushButton("Add Group B")
+        self.btn_add_b.setFixedWidth(150)
+        self.list_b = QListWidget()
         vbox_b.addWidget(self.btn_add_b); vbox_b.addWidget(self.list_b)
+        
         files_layout.addLayout(vbox_a); files_layout.addLayout(vbox_b)
         files_group.setLayout(files_layout)
         main_layout.addWidget(files_group)
@@ -201,22 +182,26 @@ class ReconApp(QMainWindow):
         # 2. Config
         config_group = QGroupBox("2. Review & Configure Analysis")
         config_layout = QVBoxLayout()
+        config_layout.setContentsMargins(15, 25, 15, 15)
         
         btn_row = QHBoxLayout()
         self.btn_analyze = QPushButton("Analyze Files & Suggest Mapping")
-        self.btn_compare_view = QPushButton("🔍") # Icon-style
-        self.btn_compare_view.setFixedSize(50, 40)
-        self.btn_compare_view.setToolTip("Side-by-Side Comparison")
+        self.btn_analyze.setFixedWidth(250)
+        self.btn_compare_view = QPushButton("Side-by-Side Comparison") # Text button
+        self.btn_compare_view.setFixedWidth(200)
         self.btn_compare_view.setEnabled(False)
         btn_row.addWidget(self.btn_analyze)
         btn_row.addWidget(self.btn_compare_view)
+        btn_row.addStretch()
         config_layout.addLayout(btn_row)
 
-        key_layout = QHBoxLayout()
-        key_layout.addWidget(QLabel("Primary Key:"))
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("Primary Key (Unique ID):"))
         self.combo_key = QComboBox()
-        key_layout.addWidget(self.combo_key)
-        config_layout.addLayout(key_layout)
+        self.combo_key.setFixedWidth(250)
+        key_row.addWidget(self.combo_key)
+        key_row.addStretch()
+        config_layout.addLayout(key_row)
 
         self.mapping_table = QTableWidget(0, 3)
         self.mapping_table.setHorizontalHeaderLabels(["Group A Column", "Group B Column", "Match Status"])
@@ -226,12 +211,21 @@ class ReconApp(QMainWindow):
         main_layout.addWidget(config_group)
 
         # 3. Exec
-        exec_layout = QVBoxLayout()
-        self.progress_label = QLabel("Ready"); self.progress_label.hide(); exec_layout.addWidget(self.progress_label)
-        self.progress_bar = QProgressBar(); self.progress_bar.hide(); exec_layout.addWidget(self.progress_bar)
+        exec_group = QFrame()
+        exec_layout = QVBoxLayout(exec_group)
+        self.progress_label = QLabel("Ready"); self.progress_label.hide(); self.progress_label.setAlignment(Qt.AlignCenter)
+        self.progress_bar = QProgressBar(); self.progress_bar.hide(); self.progress_bar.setFixedHeight(15)
+        exec_layout.addWidget(self.progress_label); exec_layout.addWidget(self.progress_bar)
+        
+        btn_recon_row = QHBoxLayout()
+        btn_recon_row.addStretch()
         self.btn_reconcile = QPushButton("Run Full Batch Reconciliation")
-        exec_layout.addWidget(self.btn_reconcile)
-        main_layout.addLayout(exec_layout)
+        self.btn_reconcile.setFixedSize(300, 45)
+        self.btn_reconcile.setStyleSheet("font-weight: bold; font-size: 14px; background-color: #4CAF50; color: white;")
+        btn_recon_row.addWidget(self.btn_reconcile)
+        btn_recon_row.addStretch()
+        exec_layout.addLayout(btn_recon_row)
+        main_layout.addWidget(exec_group)
 
         # Connections
         self.btn_add_a.clicked.connect(lambda: self.select_files('a'))
@@ -249,62 +243,69 @@ class ReconApp(QMainWindow):
         if self.is_dark_mode:
             self.setStyleSheet("""
                 QMainWindow, QWidget { background-color: #1e1e1e; color: #e0e0e0; font-family: 'Segoe UI'; }
-                QGroupBox { border: 2px solid #3d3d3d; border-radius: 8px; margin-top: 20px; font-weight: bold; color: #2196F3; }
-                QPushButton { background-color: #333333; border: 1px solid #555555; border-radius: 4px; padding: 8px; color: #e0e0e0; }
+                QGroupBox { border: 1px solid #3d3d3d; border-radius: 8px; margin-top: 15px; font-weight: bold; color: #2196F3; font-size: 13px; }
+                QGroupBox::title { subcontrol-origin: margin; left: 15px; padding: 0 5px; }
+                QPushButton { background-color: #333333; border: 1px solid #555555; border-radius: 6px; padding: 8px; color: #e0e0e0; }
                 QPushButton:hover { background-color: #444444; border: 1px solid #2196F3; }
-                QListWidget, QTableWidget, QComboBox { background-color: #252526; border: 1px solid #3d3d3d; color: #e0e0e0; }
+                QListWidget, QTableWidget, QComboBox { background-color: #252526; border: 1px solid #3d3d3d; color: #e0e0e0; border-radius: 4px; }
                 QHeaderView::section { background-color: #333333; color: #e0e0e0; padding: 5px; border: 1px solid #3d3d3d; }
-                QProgressBar { border: 2px solid #3d3d3d; text-align: center; }
-                QProgressBar::chunk { background-color: #4CAF50; }
+                QProgressBar { border: 1px solid #3d3d3d; text-align: center; border-radius: 7px; background: #252526; }
+                QProgressBar::chunk { background-color: #4CAF50; border-radius: 7px; }
             """)
         else:
             self.setStyleSheet("""
-                QMainWindow, QWidget { background-color: #f5f5f5; color: #333333; font-family: 'Segoe UI'; }
-                QGroupBox { border: 2px solid #cccccc; border-radius: 8px; margin-top: 20px; font-weight: bold; color: #1976D2; }
-                QPushButton { background-color: #e0e0e0; border: 1px solid #999999; border-radius: 4px; padding: 8px; color: #333333; }
-                QPushButton:hover { background-color: #d0d0d0; border: 1px solid #1976D2; }
-                QListWidget, QTableWidget, QComboBox { background-color: #ffffff; border: 1px solid #cccccc; color: #333333; }
-                QHeaderView::section { background-color: #eeeeee; color: #333333; padding: 5px; border: 1px solid #cccccc; }
-                QProgressBar { border: 2px solid #cccccc; text-align: center; }
-                QProgressBar::chunk { background-color: #4CAF50; }
+                QMainWindow, QWidget { background-color: #f8f9fa; color: #212529; font-family: 'Segoe UI'; }
+                QGroupBox { border: 1px solid #dee2e6; border-radius: 8px; margin-top: 15px; font-weight: bold; color: #0d6efd; font-size: 13px; }
+                QGroupBox::title { subcontrol-origin: margin; left: 15px; padding: 0 5px; }
+                QPushButton { background-color: #ffffff; border: 1px solid #ced4da; border-radius: 6px; padding: 8px; color: #212529; }
+                QPushButton:hover { background-color: #e9ecef; border: 1px solid #0d6efd; }
+                QListWidget, QTableWidget, QComboBox { background-color: #ffffff; border: 1px solid #ced4da; color: #212529; border-radius: 4px; }
+                QHeaderView::section { background-color: #e9ecef; color: #212529; padding: 5px; border: 1px solid #ced4da; }
+                QProgressBar { border: 1px solid #ced4da; text-align: center; border-radius: 7px; background: #e9ecef; }
+                QProgressBar::chunk { background-color: #198754; border-radius: 7px; }
             """)
 
     def show_info(self):
         msg = QDialog(self)
-        msg.setWindowTitle("About Application")
-        msg.setFixedSize(500, 450)
+        msg.setWindowTitle("About AI Recon Tool")
+        msg.setFixedSize(500, 480)
         layout = QVBoxLayout(msg)
+        layout.setContentsMargins(30, 30, 30, 30)
         
-        # App Logo
         logo_label = QLabel()
         pixmap = QPixmap("assets/logo.png")
         if not pixmap.isNull():
-            logo_label.setPixmap(pixmap.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo_label.setPixmap(pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(logo_label)
 
-        info_text = QLabel("""
-            <div style='text-align: center;'>
-                <h2 style='color: #2196F3;'>AI Recon Tool</h2>
-                <p><b>Version 1.0.0</b></p>
-                <p>Multi-format AI Reconciliation Engine</p>
-                <hr>
-                <p><b>Created By:</b></p>
-                <p>Rafirose Khan Shah<br>Ruhi Khanna</p>
-                <p><small>rafirosekhan@gmail.com | ruhikh282@gmail.com</small></p>
+        info_text = QLabel(f"""
+            <div style='text-align: center; font-family: Segoe UI;'>
+                <h2 style='color: {"#2196F3" if self.is_dark_mode else "#0d6efd"}; margin-top: 10px;'>AI RECON TOOL</h2>
+                <p style='color: {"#888" if self.is_dark_mode else "#666"};'>Professional Data Reconciliation Suite</p>
+                <hr style='border: 0; border-top: 1px solid #3d3d3d;'>
+                <div style='margin-top: 15px;'>
+                    <b>Created By:</b><br>
+                    <span style='font-size: 14px;'>Rafirose Khan Shah & Ruhi Khanna</span>
+                </div>
+                <div style='margin-top: 10px; color: #2196F3;'>
+                    rafirosekhan@gmail.com<br>ruhikh282@gmail.com
+                </div>
+                <p style='margin-top: 20px; font-size: 11px; color: #888;'>Version 1.0.0 | © 2026 ASI</p>
             </div>
         """)
         info_text.setTextFormat(Qt.RichText)
         layout.addWidget(info_text)
         
         btn_close = QPushButton("Close")
+        btn_close.setFixedWidth(100)
         btn_close.clicked.connect(msg.accept)
+        layout.setAlignment(btn_close, Qt.AlignCenter)
         layout.addWidget(btn_close)
         msg.exec()
 
     def handle_user_menu(self, index):
-        if self.user_menu.itemText(index) == "Logout":
-            self.close()
+        if self.user_menu.itemText(index) == "Logout": self.close()
 
     def select_files(self, group):
         files, _ = QFileDialog.getOpenFileNames(self, f"Select Group {group.upper()}", "", "Data Files (*.xlsx *.xls *.csv *.pdf)")
