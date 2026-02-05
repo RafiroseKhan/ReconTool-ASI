@@ -7,8 +7,55 @@ import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-                             QComboBox, QGroupBox, QListWidget, QDialog, QProgressBar)
+                             QComboBox, QGroupBox, QListWidget, QDialog, QProgressBar,
+                             QTabWidget, QSplitter)
 from PySide6.QtCore import Qt, QThread, Signal
+
+class ComparisonView(QDialog):
+    def __init__(self, df_a, df_b, mapping, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Side-by-Side Comparison (Beyond Compare Style)")
+        self.setMinimumSize(1200, 700)
+        layout = QVBoxLayout(self)
+        
+        # Comparison logic: Align B to A based on mapping
+        inv_mapping = {v: k for k, v in mapping.items()}
+        df_b_aligned = df_b.rename(columns=inv_mapping)
+        
+        splitter = QSplitter(Qt.Horizontal)
+        
+        # Table A
+        self.table_a = QTableWidget()
+        self.populate_table(self.table_a, df_a, "Group A")
+        
+        # Table B
+        self.table_b = QTableWidget()
+        self.populate_table(self.table_b, df_b_aligned, "Group B (Aligned)")
+        
+        # Synchronize Scrolling
+        self.table_a.verticalScrollBar().valueChanged.connect(
+            self.table_b.verticalScrollBar().setValue
+        )
+        self.table_b.verticalScrollBar().valueChanged.connect(
+            self.table_a.verticalScrollBar().setValue
+        )
+        
+        splitter.addWidget(self.table_a)
+        splitter.addWidget(self.table_b)
+        layout.addWidget(splitter)
+
+    def populate_table(self, table, df, title):
+        table.setRowCount(len(df))
+        table.setColumnCount(len(df.columns))
+        table.setHorizontalHeaderLabels(df.columns)
+        
+        for i in range(len(df)):
+            for j in range(len(df.columns)):
+                val = str(df.iloc[i, j])
+                item = QTableWidgetItem(val)
+                table.setItem(i, j, item)
+        
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
 class ReconWorker(QThread):
     progress = Signal(int)
@@ -150,9 +197,17 @@ class ReconApp(QMainWindow):
         config_layout = QVBoxLayout()
         
         # Analyze Button
+        btn_layout = QHBoxLayout()
         self.btn_analyze = QPushButton("Analyze Files & Suggest Mapping")
         self.btn_analyze.setStyleSheet("background-color: #2196F3; color: white; padding: 10px; font-weight: bold;")
-        config_layout.addWidget(self.btn_analyze)
+        
+        self.btn_compare_view = QPushButton("🔍 Side-by-Side View")
+        self.btn_compare_view.setStyleSheet("background-color: #673AB7; color: white; padding: 10px; font-weight: bold;")
+        self.btn_compare_view.setEnabled(False)
+        
+        btn_layout.addWidget(self.btn_analyze)
+        btn_layout.addWidget(self.btn_compare_view)
+        config_layout.addLayout(btn_layout)
 
         # Key Selection
         key_layout = QHBoxLayout()
@@ -206,6 +261,7 @@ class ReconApp(QMainWindow):
         self.btn_clear_a.clicked.connect(lambda: self.clear_files('a'))
         self.btn_clear_b.clicked.connect(lambda: self.clear_files('b'))
         self.btn_analyze.clicked.connect(self.run_analysis)
+        self.btn_compare_view.clicked.connect(self.open_comparison_view)
         self.btn_reconcile.clicked.connect(self.run_reconciliation)
 
     def open_admin_portal(self):
@@ -286,23 +342,37 @@ class ReconApp(QMainWindow):
         
         try:
             # Analyze based on the first file of the batch
-            df_a = self.coordinator.get_handler(self.files_a[0]).read(self.files_a[0])
-            df_b = self.coordinator.get_handler(self.files_b[0]).read(self.files_b[0])
+            self.current_df_a = self.coordinator.get_handler(self.files_a[0]).read(self.files_a[0])
+            self.current_df_b = self.coordinator.get_handler(self.files_b[0]).read(self.files_b[0])
             
             # Populate Key Dropdown
             self.combo_key.clear()
-            self.combo_key.addItems(df_a.columns.tolist())
-            suggested_key = self.coordinator.mapper.suggest_primary_key(df_a)
+            self.combo_key.addItems(self.current_df_a.columns.tolist())
+            suggested_key = self.coordinator.mapper.suggest_primary_key(self.current_df_a)
             self.combo_key.setCurrentText(suggested_key)
             
             # Suggest Mappings
-            mapping = self.coordinator.mapper.suggest_mapping(df_a.columns.tolist(), df_b.columns.tolist())
-            self.update_mapping_table(mapping, df_b.columns.tolist())
+            mapping = self.coordinator.mapper.suggest_mapping(self.current_df_a.columns.tolist(), self.current_df_b.columns.tolist())
+            self.update_mapping_table(mapping, self.current_df_b.columns.tolist())
             
-            QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings using the dropdowns.")
+            self.btn_compare_view.setEnabled(True)
+            QMessageBox.information(self, "Analysis Complete", "AI has analyzed the file structure.\n\n1. Select the correct Primary Key from the dropdown.\n2. Review/Edit the column mappings.\n3. Use 'Side-by-Side View' to see raw data alignment.")
             self.db.log_audit(self.user_info['id'], "FILE_ANALYSIS", f"Analyzed {os.path.basename(self.files_a[0])}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Analysis failed: {str(e)}")
+
+    def open_comparison_view(self):
+        if hasattr(self, 'current_df_a') and hasattr(self, 'current_df_b'):
+            # Get current mapping from table
+            mapping = {}
+            for row in range(self.mapping_table.rowCount()):
+                item_a = self.mapping_table.item(row, 0)
+                combo_b = self.mapping_table.cellWidget(row, 1)
+                if item_a and combo_b:
+                    mapping[item_a.text()] = combo_b.currentText()
+            
+            view = ComparisonView(self.current_df_a, self.current_df_b, mapping, self)
+            view.show()
 
     def update_mapping_table(self, mapping: dict, cols_b: list):
         self.mapping_table.setRowCount(len(mapping))
