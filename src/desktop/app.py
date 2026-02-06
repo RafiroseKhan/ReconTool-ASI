@@ -1,9 +1,15 @@
+import sys
+import os
+
+# Add the project root to sys.path so it works when run from anywhere
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from src.core.coordinator import ReconCoordinator
 from src.desktop.login import LoginScreen
 from src.desktop.admin import AdminPortal
 from src.core.database import DatabaseManager
-import sys
-import os
 import pandas as pd
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
@@ -20,15 +26,11 @@ class ComparisonView(QDialog):
         self.setMinimumSize(1200, 750)
         layout = QVBoxLayout(self)
         
-        # Comparison logic: Align B to A based on mapping
-        inv_mapping = {v: k for k, v in mapping.items()}
-        df_b_aligned = df_b.rename(columns=inv_mapping)
-        
         splitter = QSplitter(Qt.Horizontal)
         self.table_a = QTableWidget()
         self.table_b = QTableWidget()
         
-        self.populate_and_compare(df_a, df_b_aligned, mapping, key_col)
+        self.populate_and_compare(df_a, df_b, mapping, key_col)
         
         # Synchronize Scrolling
         self.table_a.verticalScrollBar().valueChanged.connect(self.table_b.verticalScrollBar().setValue)
@@ -49,25 +51,24 @@ class ComparisonView(QDialog):
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
         # Style definitions
-        diff_color = QColor("#ff4d4d") # Red
-        diff_text = QColor("#ffffff")
+        diff_color = QColor("#ff4d4d") # Bright Red
         match_color = QColor("#1e3a1e") # Dark Green
-        match_text = QColor("#e0e0e0")
-        missing_color = QColor("#3d3d3d")
+        missing_color = QColor("#3d3d3d") # Grey
+        text_color = QColor("#ffffff")
 
-        total_cells = 0
-        mismatch_cells = 0
-
-        # 2. Setup Indexing for B using the mapped key
+        # 2. Setup Indexing for B
         key_in_b = mapping.get(key_col, key_col)
-        
-        # Create a copy of B with string keys for reliable lookup
         df_b_search = df_b.copy()
+        
+        # Convert search key to string for reliable matching
         if key_in_b in df_b_search.columns:
             df_b_search[key_in_b] = df_b_search[key_in_b].astype(str).str.strip()
             df_b_idx = df_b_search.set_index(key_in_b)
         else:
             df_b_idx = df_b_search
+
+        mismatch_cells = 0
+        total_data_cells = rows * cols
 
         for i in range(rows):
             row_a = df_a.iloc[i]
@@ -76,53 +77,48 @@ class ComparisonView(QDialog):
             # Find matching row in B
             row_b = None
             try:
-                if key_in_b in df_b_search.columns:
-                    if val_key_a in df_b_idx.index:
-                        match_data = df_b_idx.loc[val_key_a]
-                        row_b = match_data.iloc[0] if isinstance(match_data, pd.DataFrame) else match_data
+                if val_key_a in df_b_idx.index:
+                    match_data = df_b_idx.loc[val_key_a]
+                    row_b = match_data.iloc[0] if isinstance(match_data, pd.DataFrame) else match_data
             except Exception:
                 row_b = None
 
             for j, col_a in enumerate(df_a.columns):
                 val_a = str(row_a[col_a]).strip()
                 item_a = QTableWidgetItem(val_a)
-                total_cells += 1
+                item_a.setForeground(text_color)
                 
                 if row_b is None:
-                    # Row missing in B
                     item_a.setBackground(missing_color)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
                     mismatch_cells += 1
                 else:
-                    # Map Group A column to Group B column
                     col_b = mapping.get(col_a, col_a)
                     val_b = str(row_b[col_b]).strip() if col_b in row_b.index else ""
                     item_b = QTableWidgetItem(val_b)
+                    item_b.setForeground(text_color)
                     
                     if val_a == val_b:
-                        bg, fg = match_color, match_text
+                        bg = match_color
                     else:
-                        bg, fg = diff_color, diff_text
+                        bg = diff_color
                         mismatch_cells += 1
                         item_a.setToolTip(f"B value: {val_b}")
                         item_b.setToolTip(f"A value: {val_a}")
                     
-                    item_a.setBackground(bg); item_a.setForeground(fg)
-                    item_b.setBackground(bg); item_b.setForeground(fg)
+                    item_a.setBackground(bg)
+                    item_b.setBackground(bg)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, item_b)
 
         # 3. Accuracy Calculation fix
-        # Accuracy is the % of cells that matched
-        accuracy = ((total_cells - mismatch_cells) / total_cells * 100) if total_cells > 0 else 0
-        diff_rate = 100 - accuracy
-
+        accuracy = ((total_data_cells - mismatch_cells) / total_data_cells * 100) if total_data_cells > 0 else 0
+        
         QMessageBox.information(self, "Comparison Statistics", 
                                 f"Comparison Complete!\n\n"
                                 f"Accuracy Score: {accuracy:.2f}%\n"
-                                f"Difference Rate: {diff_rate:.2f}%\n"
-                                f"Total Cells Scanned: {total_cells}\n"
+                                f"Total Cells Scanned: {total_data_cells}\n"
                                 f"Mismatched Cells: {mismatch_cells}")
 
 class ReconWorker(QThread):
