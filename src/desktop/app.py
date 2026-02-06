@@ -39,7 +39,8 @@ class ComparisonView(QDialog):
         layout.addWidget(splitter)
 
     def populate_and_compare(self, df_a, df_b, mapping, key_col):
-        rows = max(len(df_a), len(df_b))
+        # 1. Prepare Tables
+        rows = len(df_a)
         cols = len(df_a.columns)
         for table in [self.table_a, self.table_b]:
             table.setRowCount(rows)
@@ -48,46 +49,55 @@ class ComparisonView(QDialog):
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
         # Style definitions
-        diff_color = QColor("#ff4d4d") # Bright Red for differences
+        diff_color = QColor("#ff4d4d") # Red
         diff_text = QColor("#ffffff")
-        match_color = QColor("#1e3a1e") # Dark Green for matches
+        match_color = QColor("#1e3a1e") # Dark Green
         match_text = QColor("#e0e0e0")
-        missing_row_color = QColor("#3d3d3d") # Grey for missing rows
+        missing_color = QColor("#3d3d3d")
 
         total_cells = 0
         mismatch_cells = 0
 
-        # Indexing for fast lookup
-        if key_col and key_col in df_a.columns and key_col in df_b.columns:
-            df_b_idx = df_b.set_index(key_col)
+        # 2. Setup Indexing for B using the mapped key
+        key_in_b = mapping.get(key_col, key_col)
+        
+        # Create a copy of B with string keys for reliable lookup
+        df_b_search = df_b.copy()
+        if key_in_b in df_b_search.columns:
+            df_b_search[key_in_b] = df_b_search[key_in_b].astype(str).str.strip()
+            df_b_idx = df_b_search.set_index(key_in_b)
         else:
-            df_b_idx = df_b
+            df_b_idx = df_b_search
 
-        for i in range(len(df_a)):
+        for i in range(rows):
             row_a = df_a.iloc[i]
-            key_val = str(row_a[key_col]).strip() if key_col else i
+            val_key_a = str(row_a[key_col]).strip()
             
+            # Find matching row in B
+            row_b = None
             try:
-                if key_col:
-                    row_b = df_b_idx.loc[key_val]
-                    if isinstance(row_b, pd.DataFrame): row_b = row_b.iloc[0]
-                else:
-                    row_b = df_b.iloc[i]
-                found_b = True
-            except: found_b = False
+                if key_in_b in df_b_search.columns:
+                    if val_key_a in df_b_idx.index:
+                        match_data = df_b_idx.loc[val_key_a]
+                        row_b = match_data.iloc[0] if isinstance(match_data, pd.DataFrame) else match_data
+            except Exception:
+                row_b = None
 
-            for j, col in enumerate(df_a.columns):
-                val_a = str(row_a[col]).strip()
+            for j, col_a in enumerate(df_a.columns):
+                val_a = str(row_a[col_a]).strip()
                 item_a = QTableWidgetItem(val_a)
                 total_cells += 1
                 
-                if not found_b:
-                    item_a.setBackground(missing_row_color)
+                if row_b is None:
+                    # Row missing in B
+                    item_a.setBackground(missing_color)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
                     mismatch_cells += 1
                 else:
-                    val_b = str(row_b[col]).strip() if col in row_b else ""
+                    # Map Group A column to Group B column
+                    col_b = mapping.get(col_a, col_a)
+                    val_b = str(row_b[col_b]).strip() if col_b in row_b.index else ""
                     item_b = QTableWidgetItem(val_b)
                     
                     if val_a == val_b:
@@ -95,21 +105,23 @@ class ComparisonView(QDialog):
                     else:
                         bg, fg = diff_color, diff_text
                         mismatch_cells += 1
-                        item_a.setToolTip(f"Group B value: {val_b}")
-                        item_b.setToolTip(f"Group A value: {val_a}")
+                        item_a.setToolTip(f"B value: {val_b}")
+                        item_b.setToolTip(f"A value: {val_a}")
                     
                     item_a.setBackground(bg); item_a.setForeground(fg)
                     item_b.setBackground(bg); item_b.setForeground(fg)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, item_b)
 
-        # Calculate and show percentage
-        diff_percent = (mismatch_cells / total_cells * 100) if total_cells > 0 else 0
-        match_percent = 100 - diff_percent
+        # 3. Accuracy Calculation fix
+        # Accuracy is the % of cells that matched
+        accuracy = ((total_cells - mismatch_cells) / total_cells * 100) if total_cells > 0 else 0
+        diff_rate = 100 - accuracy
+
         QMessageBox.information(self, "Comparison Statistics", 
                                 f"Comparison Complete!\n\n"
-                                f"Accuracy Score: {match_percent:.2f}%\n"
-                                f"Difference Rate: {diff_percent:.2f}%\n"
+                                f"Accuracy Score: {accuracy:.2f}%\n"
+                                f"Difference Rate: {diff_rate:.2f}%\n"
                                 f"Total Cells Scanned: {total_cells}\n"
                                 f"Mismatched Cells: {mismatch_cells}")
 
