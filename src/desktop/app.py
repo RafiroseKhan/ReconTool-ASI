@@ -47,6 +47,14 @@ class ComparisonView(QDialog):
             table.setHorizontalHeaderLabels(df_a.columns)
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
+        # Style definitions
+        mismatch_color = QColor("#ffeb3b") # Bright Yellow
+        mismatch_text = QColor("#000000")
+        missing_color = QColor("#f44336") # Red
+        missing_text = QColor("#ffffff")
+        match_color = QColor("#4caf50") # Green
+        match_text = QColor("#ffffff")
+
         # Indexing for fast lookup
         if key_col and key_col in df_a.columns and key_col in df_b.columns:
             df_b_idx = df_b.set_index(key_col)
@@ -55,7 +63,8 @@ class ComparisonView(QDialog):
 
         for i in range(len(df_a)):
             row_a = df_a.iloc[i]
-            key_val = row_a[key_col] if key_col else i
+            key_val = str(row_a[key_col]).strip() if key_col else i
+            
             try:
                 if key_col:
                     row_b = df_b_idx.loc[key_val]
@@ -66,19 +75,30 @@ class ComparisonView(QDialog):
             except: found_b = False
 
             for j, col in enumerate(df_a.columns):
-                val_a = str(row_a[col])
+                val_a = str(row_a[col]).strip()
                 item_a = QTableWidgetItem(val_a)
+                
                 if not found_b:
-                    item_a.setBackground(QColor("#5a1d1d"))
+                    item_a.setBackground(missing_color)
+                    item_a.setForeground(missing_text)
+                    item_a.setToolTip("Record missing in Group B")
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
                 else:
-                    val_b = str(row_b[col]) if col in row_b else ""
+                    val_b = str(row_b[col]).strip() if col in row_b else ""
                     item_b = QTableWidgetItem(val_b)
-                    if val_a == val_b: bg = QColor("#1e3a1e")
-                    else: bg = QColor("#5a5a1d")
-                    item_a.setBackground(bg); item_b.setBackground(bg)
-                    self.table_a.setItem(i, j, item_a); self.table_b.setItem(i, j, item_b)
+                    
+                    if val_a == val_b:
+                        bg, fg = match_color, match_text
+                    else:
+                        bg, fg = mismatch_color, mismatch_text
+                        item_a.setToolTip(f"B value: {val_b}")
+                        item_b.setToolTip(f"A value: {val_a}")
+                    
+                    item_a.setBackground(bg); item_a.setForeground(fg)
+                    item_b.setBackground(bg); item_b.setForeground(fg)
+                    self.table_a.setItem(i, j, item_a)
+                    self.table_b.setItem(i, j, item_b)
 
 class ReconWorker(QThread):
     progress = Signal(int)
