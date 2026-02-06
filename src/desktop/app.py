@@ -86,12 +86,13 @@ class ReconWorker(QThread):
     finished = Signal(list)
     error = Signal(str)
 
-    def __init__(self, coordinator, files_a, files_b, key_col, mapping, db, user_id):
+    def __init__(self, coordinator, files_a, files_b, key_col, mapping, db, user_id, tolerance=0.01):
         super().__init__()
         self.coordinator = coordinator
         self.files_a = files_a; self.files_b = files_b
         self.key_col = key_col; self.mapping = mapping
         self.db = db; self.user_id = user_id
+        self.tolerance = tolerance
 
     def run(self):
         results = []
@@ -102,7 +103,7 @@ class ReconWorker(QThread):
                     file_b = self.files_b[i]
                     self.status.emit(f"Processing: {os.path.basename(file_a)} vs {os.path.basename(file_b)}...")
                     output_path = f"Recon_Report_{os.path.basename(file_a)}.xlsx"
-                    self.coordinator.run_full_recon(file_a, file_b, key_col=self.key_col, mapping=self.mapping, output_path=output_path)
+                    self.coordinator.run_full_recon(file_a, file_b, key_col=self.key_col, mapping=self.mapping, output_path=output_path, tolerance=self.tolerance)
                     self.db.log_recon(self.user_id, file_a, file_b, "SUCCESS", output_path)
                     results.append(output_path)
                 self.progress.emit(int(((i + 1) / total) * 100))
@@ -200,6 +201,16 @@ class ReconApp(QMainWindow):
         self.combo_key = QComboBox()
         self.combo_key.setFixedWidth(250)
         key_row.addWidget(self.combo_key)
+        
+        key_row.addSpacing(20)
+        key_row.addWidget(QLabel("Tolerance:"))
+        self.spin_tolerance = QComboBox()
+        self.spin_tolerance.addItems(["0.00", "0.01", "0.05", "1.00", "10.00"])
+        self.spin_tolerance.setEditable(True)
+        self.spin_tolerance.setFixedWidth(100)
+        self.spin_tolerance.setCurrentText("0.01")
+        key_row.addWidget(self.spin_tolerance)
+        
         key_row.addStretch()
         config_layout.addLayout(key_row)
 
@@ -344,8 +355,14 @@ class ReconApp(QMainWindow):
         mapping = {}
         for r in range(self.mapping_table.rowCount()):
             mapping[self.mapping_table.item(r, 0).text()] = self.mapping_table.cellWidget(r, 1).currentText()
+        
+        try:
+            tolerance = float(self.spin_tolerance.currentText())
+        except ValueError:
+            tolerance = 0.01
+            
         self.progress_bar.show(); self.progress_label.show()
-        self.worker = ReconWorker(self.coordinator, self.files_a, self.files_b, self.combo_key.currentText(), mapping, self.db, self.user_info['id'])
+        self.worker = ReconWorker(self.coordinator, self.files_a, self.files_b, self.combo_key.currentText(), mapping, self.db, self.user_info['id'], tolerance=tolerance)
         self.worker.progress.connect(self.progress_bar.setValue)
         self.worker.status.connect(self.progress_label.setText)
         self.worker.finished.connect(lambda: (self.progress_bar.hide(), self.progress_label.hide(), QMessageBox.information(self, "Done", "Batch Complete")))
