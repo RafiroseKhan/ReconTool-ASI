@@ -48,12 +48,14 @@ class ComparisonView(QDialog):
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
         # Style definitions
-        mismatch_color = QColor("#ffeb3b") # Bright Yellow
-        mismatch_text = QColor("#000000")
-        missing_color = QColor("#f44336") # Red
-        missing_text = QColor("#ffffff")
-        match_color = QColor("#4caf50") # Green
-        match_text = QColor("#ffffff")
+        diff_color = QColor("#ff4d4d") # Bright Red for differences
+        diff_text = QColor("#ffffff")
+        match_color = QColor("#1e3a1e") # Dark Green for matches
+        match_text = QColor("#e0e0e0")
+        missing_row_color = QColor("#3d3d3d") # Grey for missing rows
+
+        total_cells = 0
+        mismatch_cells = 0
 
         # Indexing for fast lookup
         if key_col and key_col in df_a.columns and key_col in df_b.columns:
@@ -77,13 +79,13 @@ class ComparisonView(QDialog):
             for j, col in enumerate(df_a.columns):
                 val_a = str(row_a[col]).strip()
                 item_a = QTableWidgetItem(val_a)
+                total_cells += 1
                 
                 if not found_b:
-                    item_a.setBackground(missing_color)
-                    item_a.setForeground(missing_text)
-                    item_a.setToolTip("Record missing in Group B")
+                    item_a.setBackground(missing_row_color)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
+                    mismatch_cells += 1
                 else:
                     val_b = str(row_b[col]).strip() if col in row_b else ""
                     item_b = QTableWidgetItem(val_b)
@@ -91,14 +93,25 @@ class ComparisonView(QDialog):
                     if val_a == val_b:
                         bg, fg = match_color, match_text
                     else:
-                        bg, fg = mismatch_color, mismatch_text
-                        item_a.setToolTip(f"B value: {val_b}")
-                        item_b.setToolTip(f"A value: {val_a}")
+                        bg, fg = diff_color, diff_text
+                        mismatch_cells += 1
+                        item_a.setToolTip(f"Group B value: {val_b}")
+                        item_b.setToolTip(f"Group A value: {val_a}")
                     
                     item_a.setBackground(bg); item_a.setForeground(fg)
                     item_b.setBackground(bg); item_b.setForeground(fg)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, item_b)
+
+        # Calculate and show percentage
+        diff_percent = (mismatch_cells / total_cells * 100) if total_cells > 0 else 0
+        match_percent = 100 - diff_percent
+        QMessageBox.information(self, "Comparison Statistics", 
+                                f"Comparison Complete!\n\n"
+                                f"Accuracy Score: {match_percent:.2f}%\n"
+                                f"Difference Rate: {diff_percent:.2f}%\n"
+                                f"Total Cells Scanned: {total_cells}\n"
+                                f"Mismatched Cells: {mismatch_cells}")
 
 class ReconWorker(QThread):
     progress = Signal(int)
