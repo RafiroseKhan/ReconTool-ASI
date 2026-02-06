@@ -40,6 +40,7 @@ class ComparisonView(QDialog):
         layout.addWidget(splitter)
 
     def populate_and_compare(self, df_a, df_b, mapping, key_col):
+        # 1. Prepare Tables
         rows = len(df_a)
         cols = len(df_a.columns)
         for table in [self.table_a, self.table_b]:
@@ -48,16 +49,22 @@ class ComparisonView(QDialog):
             table.setHorizontalHeaderLabels(df_a.columns)
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
-        # Style Definitions (Professional Palette)
+        # Style Definitions
         diff_color = QColor("#d32f2f") # Deep Red
         match_color = QColor("#2e7d32") # Forest Green
         missing_color = QColor("#424242") # Grey
         text_color = QColor("#ffffff")
 
+        # 2. Setup Indexing for B
+        # Find out which column in B corresponds to the chosen key_col from A
         key_in_b = mapping.get(key_col, key_col)
+        
         df_b_search = df_b.copy()
+        # IMPORTANT: Normalize keys to strings and strip whitespace/newlines for matching
         if key_in_b in df_b_search.columns:
             df_b_search[key_in_b] = df_b_search[key_in_b].astype(str).str.strip()
+            # Handle potential NaN or empty strings in B's key column
+            df_b_search = df_b_search[df_b_search[key_in_b] != "nan"]
             df_b_idx = df_b_search.set_index(key_in_b)
         else:
             df_b_idx = df_b_search
@@ -68,12 +75,17 @@ class ComparisonView(QDialog):
         for i in range(rows):
             row_a = df_a.iloc[i]
             val_key_a = str(row_a[key_col]).strip()
+            
             row_b = None
             try:
-                if val_key_a in df_b_idx.index:
+                # Look up the row in B that has the same Trade Id / Key
+                if key_in_b in df_b_search.columns and val_key_a in df_b_idx.index:
                     match_data = df_b_idx.loc[val_key_a]
+                    # If multiple rows share a key, take the first one
                     row_b = match_data.iloc[0] if isinstance(match_data, pd.DataFrame) else match_data
-            except: row_b = None
+            except Exception as e:
+                print(f"Lookup error at row {i}: {e}")
+                row_b = None
 
             for j, col_a in enumerate(df_a.columns):
                 val_a = str(row_a[col_a]).strip()
@@ -81,30 +93,52 @@ class ComparisonView(QDialog):
                 item_a.setForeground(text_color)
                 
                 if row_b is None:
+                    # Row ID not found in Group B at all
                     item_a.setBackground(missing_color)
                     self.table_a.setItem(i, j, item_a)
                     self.table_b.setItem(i, j, QTableWidgetItem(""))
                     mismatch_cells += 1
                 else:
+                    # Find which column in B maps to this column in A
                     col_b = mapping.get(col_a, col_a)
-                    val_b = str(row_b[col_b]).strip() if col_b in row_b.index else ""
+                    
+                    # Fetch the value from B if the column exists
+                    val_b = ""
+                    if col_b in row_b.index:
+                        val_b = str(row_b[col_b]).strip()
+                    
                     item_b = QTableWidgetItem(val_b)
                     item_b.setForeground(text_color)
                     
-                    if val_a == val_b: bg = match_color
+                    # Logic: If strings are different, it's a mismatch
+                    # Special case: handle numeric comparison for floats in strings (e.g. "200.0" vs "200")
+                    is_match = (val_a == val_b)
+                    if not is_match:
+                        try:
+                            if float(val_a) == float(val_b):
+                                is_match = True
+                        except: pass
+
+                    if is_match:
+                        bg = match_color
                     else:
                         bg = diff_color
                         mismatch_cells += 1
-                        item_a.setToolTip(f"B: {val_b}")
-                        item_b.setToolTip(f"A: {val_a}")
+                        item_a.setToolTip(f"Group B value: {val_b}")
+                        item_b.setToolTip(f"Group A value: {val_a}")
                     
-                    item_a.setBackground(bg); item_b.setBackground(bg)
-                    self.table_a.setItem(i, j, item_a); self.table_b.setItem(i, j, item_b)
+                    item_a.setBackground(bg)
+                    item_b.setBackground(bg)
+                    self.table_a.setItem(i, j, item_a)
+                    self.table_b.setItem(i, j, item_b)
 
+        # 3. Accuracy Calculation fix
         accuracy = ((total_data_cells - mismatch_cells) / total_data_cells * 100) if total_data_cells > 0 else 0
         QMessageBox.information(self, "Comparison Statistics", 
-                                f"Comparison Complete!\n\nAccuracy Score: {accuracy:.2f}%\n"
-                                f"Total Cells Scanned: {total_data_cells}\nMismatched Cells: {mismatch_cells}")
+                                f"Comparison Complete!\n\n"
+                                f"Accuracy Score: {accuracy:.2f}%\n"
+                                f"Total Cells Scanned: {total_data_cells}\n"
+                                f"Mismatches Found: {mismatch_cells}")
 
 class ReconWorker(QThread):
     progress = Signal(int)
@@ -244,7 +278,15 @@ class ReconApp(QMainWindow):
         self.worker.start()
 
     def handle_user_menu(self, index):
-        if self.user_menu.itemText(index) == "Logout": self.close()
+        if self.user_menu.itemText(index) == "Logout":
+            self.close()
+            # Launch login screen again
+            login = LoginScreen()
+            if login.exec() == QDialog.Accepted:
+                user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
+                self.user_info = user_data
+                self.init_ui() # Re-init UI with new user info if needed
+                self.show()
 
     def toggle_theme(self):
         self.is_dark_mode = not self.is_dark_mode; self.btn_theme.setText("🌙" if self.is_dark_mode else "☀️"); self.apply_theme()
