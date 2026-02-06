@@ -76,11 +76,6 @@ class LoginScreen(QDialog):
         self.btn_login.clicked.connect(self.handle_email_login)
         layout.addWidget(self.btn_login)
 
-        self.btn_google = QPushButton("Sign in with Google")
-        self.btn_google.setStyleSheet(self.button_style("#ffffff", "#000000"))
-        self.btn_google.clicked.connect(self.handle_google_login)
-        layout.addWidget(self.btn_google)
-
         self.btn_switch_reg = QPushButton("Don't have an account? Create one")
         self.btn_switch_reg.setStyleSheet("color: #2196F3; border: none; background: transparent;")
         self.btn_switch_reg.clicked.connect(lambda: self.stack.setCurrentIndex(1))
@@ -185,27 +180,6 @@ class LoginScreen(QDialog):
             self.stack.setCurrentIndex(0)
         else:
             QMessageBox.warning(self, "Error", msg)
-
-    def handle_google_login(self):
-        # 1. Open the real Google Login page in the user's default browser
-        import webbrowser
-        google_oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&response_type=code&scope=email%20profile&redirect_uri=http://localhost:8080"
-        webbrowser.open(google_oauth_url)
-        
-        # 2. Simulation for development:
-        # In a full production app, we would start a local listener to capture the 'code' 
-        # from the redirect. For now, we simulate the successful return of your profile.
-        self.user_data = {"type": "google", "id": "rafirosekhan@gmail.com"}
-        
-        # Verify if this user exists in DB, if not create them
-        if not self.db.is_admin(self.user_data['id']):
-            with self.db.connect() as conn:
-                res = conn.execute("SELECT email FROM users WHERE email = ?", (self.user_data['id'],)).fetchone()
-                if not res:
-                    self.db.create_user(self.user_data['id'], "google_auth_placeholder")
-
-        self.login_success.emit(self.user_data)
-        self.accept()
 
     def handle_guest(self):
         self.user_data = {"type": "guest", "id": "Guest_Session"}
