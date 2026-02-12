@@ -4,6 +4,40 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QPixmap
 from src.core.database import DatabaseManager
 
+class SplashScreen(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Aura - Initializing")
+        self.setFixedSize(500, 300)
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
+        layout = QVBoxLayout(self)
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #121212;
+                border: 2px solid #2196F3;
+                border-radius: 20px;
+            }
+        """)
+        frame_layout = QVBoxLayout(frame)
+        
+        title = QLabel("AURA")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: #2196F3; font-size: 60px; font-weight: 100; letter-spacing: 15px; border: none;")
+        frame_layout.addWidget(title)
+        
+        subtitle = QLabel("INTELLIGENT RECONCILIATION")
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("color: #888; font-size: 10px; letter-spacing: 4px; border: none;")
+        frame_layout.addWidget(subtitle)
+        
+        layout.addWidget(frame)
+        
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(2000, self.accept)
+
 class LoginScreen(QDialog):
     login_success = Signal(dict) # Signal emits user info on success
 
