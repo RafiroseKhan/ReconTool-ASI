@@ -16,7 +16,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.core.coordinator import ReconCoordinator
-from src.desktop.login import LoginScreen, SplashScreen
+from src.desktop.login import LoginScreen
 from src.desktop.admin import AdminPortal
 from src.core.database import DatabaseManager
 
@@ -400,11 +400,9 @@ class ReconApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    splash = SplashScreen()
-    if splash.exec() == QDialog.Accepted:
-        login = LoginScreen()
-        if login.exec() == QDialog.Accepted:
-            user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
-            window = ReconApp(user_info=user_data)
-            window.show()
-            sys.exit(app.exec())
+    login = LoginScreen()
+    if login.exec() == QDialog.Accepted:
+        user_data = getattr(login, 'user_data', {"type": "guest", "id": "Guest"})
+        window = ReconApp(user_info=user_data)
+        window.show()
+        sys.exit(app.exec())
