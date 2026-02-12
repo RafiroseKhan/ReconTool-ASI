@@ -270,17 +270,23 @@ class ReconApp(QMainWindow):
                 if p not in file_store:
                     file_store.append(p)
                     item = QListWidgetItem(target_list)
+                    # We pass the path to the removal function and find the item by index
                     widget = FileListWidget(os.path.basename(p), lambda path=p, g=group: self.remove_file(g, path), is_dark=self.is_dark_mode)
                     item.setSizeHint(widget.sizeHint())
-                    target_list.addItem(item); target_list.setItemWidget(item, widget)
+                    target_list.setItemWidget(item, widget)
 
     def remove_file(self, group, path):
         store = self.files_a if group == 'a' else self.files_b
         target_list = self.list_a if group == 'a' else self.list_b
+        
         if path in store:
             idx = store.index(path)
             store.pop(idx)
-            target_list.takeItem(idx)
+            # Efficiently remove and delete the item to refresh UI
+            item = target_list.takeItem(idx)
+            if item:
+                del item
+            target_list.update()
 
     def run_analysis(self):
         if not self.files_a or not self.files_b: return
