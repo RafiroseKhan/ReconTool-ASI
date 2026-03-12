@@ -23,7 +23,7 @@ class ReconCoordinator:
         else:
             raise ValueError(f"Unsupported file format: {ext}")
 
-    def run_full_recon(self, path_a: str, path_b: str, key_col: str, mapping: dict, output_path: str, tolerance: float = 0.01):
+    def run_full_recon(self, path_a: str, path_b: str, key_col: str, mapping: dict, output_path: str, tolerance: float = 0.01, accepted_matches: set = None):
         # 1. Load Data
         df_a = self.get_handler(path_a).read(path_a)
         df_b = self.get_handler(path_b).read(path_b)
@@ -38,7 +38,7 @@ class ReconCoordinator:
 
         # 3. Reconcile
         engine = ReconEngine(df_a, df_b)
-        recon_data = engine.reconcile(key_col, mapping, tolerance=tolerance)
+        recon_data = engine.reconcile(key_col, mapping, tolerance=tolerance, accepted_matches=accepted_matches)
 
         # 4. Generate Report
         self.reporter.generate_report(recon_data, output_path)

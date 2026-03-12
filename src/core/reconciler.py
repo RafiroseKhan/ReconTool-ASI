@@ -5,83 +5,96 @@ class ReconEngine:
     """The core logic for comparing two datasets (Group A and Group B)."""
     
     def __init__(self, df_a: pd.DataFrame, df_b: pd.DataFrame):
-        self.df_a = df_a
-        self.df_b = df_b
-        self.results = {}
+        self.df_a = df_a.copy()
+        self.df_b = df_b.copy()
+        
+        # Pre-process: strip column names
+        self.df_a.columns = [str(c).strip() for c in self.df_a.columns]
+        self.df_b.columns = [str(c).strip() for c in self.df_b.columns]
 
-    def reconcile(self, key_col: str, mapping: Dict[str, str], tolerance: float = 0.01) -> Dict:
+    def reconcile(self, key_col: str, mapping: Dict[str, str], tolerance: float = 0.01, accepted_matches: set = None) -> Dict:
         """
         Executes reconciliation based on a unique key and column mapping.
-        Includes tolerance for numeric fields and fuzzy string matching.
         """
-        # Ensure key_col itself is in the mapping
-        if key_col not in mapping:
-            norm_key = "".join(filter(str.isalnum, str(key_col).lower()))
-            for col_b in self.df_b.columns:
-                if "".join(filter(str.isalnum, str(col_b).lower())) == norm_key:
-                    mapping[key_col] = col_b
-                    break
+        accepted_matches = accepted_matches or set()
         
-        if key_col not in mapping and key_col in self.df_b.columns:
-            mapping[key_col] = key_col
+        # 1. Preparation: ensure key_col exists
+        if key_col not in self.df_a.columns:
+             raise ValueError(f"Primary Key '{key_col}' not found in Group A")
+        
+        target_key_col = mapping.get(key_col, key_col)
+        if target_key_col not in self.df_b.columns:
+             raise ValueError(f"Mapped Primary Key '{target_key_col}' not found in Group B")
 
-        # 1. Align column names in B to match A
-        inv_mapping = {v: k for k, v in mapping.items()}
-        df_b_aligned = self.df_b.rename(columns=inv_mapping)
+        def normalize_key(v):
+            if pd.isna(v): return "nan"
+            try:
+                f_val = float(v)
+                if f_val == int(f_val): return str(int(f_val)).strip()
+                return str(f_val).strip()
+            except:
+                return str(v).strip()
+
+        # 2. Index Data for fast lookup
+        df_a_work = self.df_a.copy()
+        df_a_work['_orig_row_idx'] = range(len(df_a_work))
+        df_a_work['_match_key'] = df_a_work[key_col].apply(normalize_key)
         
-        # 2. Identify Row Deltas
-        keys_a = set(self.df_a[key_col].astype(str).str.strip())
-        keys_b = set(df_b_aligned[key_col].astype(str).str.strip())
+        df_b_work = self.df_b.copy()
+        df_b_work['_match_key'] = df_b_work[target_key_col].apply(normalize_key)
         
+        # Drop duplicates in index to prevent the 'getting stuck' or expansion issue
+        a_indexed = df_a_work.drop_duplicates(subset=['_match_key']).set_index('_match_key')
+        b_indexed = df_b_work.drop_duplicates(subset=['_match_key']).set_index('_match_key')
+        
+        keys_a = set(a_indexed.index)
+        keys_b = set(b_indexed.index)
+        
+        common_keys = keys_a & keys_b
         only_in_a = keys_a - keys_b
         only_in_b = keys_b - keys_a
-        common_keys = keys_a & keys_b
         
-        # 3. Cell-by-Cell Comparison
+        # 3. Compare Cell-by-Cell
         mismatches = []
-        
-        a_indexed = self.df_a.copy()
-        a_indexed[key_col] = a_indexed[key_col].astype(str).str.strip()
-        a_indexed = a_indexed.set_index(key_col, drop=False)
-        
-        b_indexed = df_b_aligned.copy()
-        b_indexed[key_col] = b_indexed[key_col].astype(str).str.strip()
-        b_indexed = b_indexed.set_index(key_col, drop=False)
         
         for key in common_keys:
             row_a = a_indexed.loc[key]
             row_b = b_indexed.loc[key]
+            orig_idx = int(row_a['_orig_row_idx'])
             
             row_diffs = {}
-            for col_a in mapping.keys():
-                if col_a in row_a.index and col_a in row_b.index:
+            for col_a, col_b in mapping.items():
+                if col_a in row_a.index and col_b in row_b.index:
+                    # Feature: Skip if manually accepted in UI
+                    if (orig_idx, col_a) in accepted_matches:
+                        continue
+                        
                     val_a = row_a[col_a]
-                    val_b = row_b[col_a]
+                    val_b = row_b[col_b]
                     
-                    # Scenario: Handling NaN/Null
+                    # Handle nulls
                     if pd.isna(val_a) and pd.isna(val_b):
                         continue
                     
-                    # Scenario: Tolerance Level for numeric values (Case 7)
+                    # Numerical comparison with tolerance
                     try:
-                        num_a = float(val_a)
-                        num_b = float(val_b)
+                        num_a, num_b = float(val_a), float(val_b)
                         if abs(num_a - num_b) > tolerance:
                             row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
                         continue
-                    except (ValueError, TypeError):
+                    except:
                         pass
-
-                    # Scenario: String Mismatch (Case 8 - could expand with fuzzy logic)
-                    if str(val_a).strip() != str(val_b).strip():
-                        row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
+                    
+                    # String comparison
+                    str_a, str_b = str(val_a).strip(), str(val_b).strip()
+                    if str_a != str_b:
+                        # Check for 'logical match' (date formats etc)
+                        if str_a.replace("/", "-") != str_b.replace("/", "-"):
+                            row_diffs[col_a] = {"val_a": val_a, "val_b": val_b}
             
             if row_diffs:
-                mismatches.append({
-                    "key": key,
-                    "differences": row_diffs
-                })
-                
+                mismatches.append({"key": key, "differences": row_diffs})
+
         return {
             "summary": {
                 "total_a": len(self.df_a),

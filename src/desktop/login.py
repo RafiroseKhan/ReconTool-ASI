@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QFrame, QMessageBox, QStackedWidget, QWidget)
-from PySide6.QtCore import Qt, Signal
+                             QLineEdit, QPushButton, QFrame, QMessageBox, QStackedWidget, QWidget,
+                             QGraphicsOpacityEffect)
+from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QTimer
 from PySide6.QtGui import QFont, QPixmap
 from src.core.database import DatabaseManager
 
@@ -8,35 +9,77 @@ class SplashScreen(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Aura - Initializing")
-        self.setFixedSize(500, 300)
+        self.setFixedSize(500, 320)
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
-        layout = QVBoxLayout(self)
-        frame = QFrame()
-        frame.setStyleSheet("""
+        self.layout = QVBoxLayout(self)
+        self.frame = QFrame()
+        self.frame.setStyleSheet("""
             QFrame {
                 background-color: #121212;
-                border: 2px solid #2196F3;
+                border: 1px solid #333;
                 border-radius: 20px;
             }
         """)
-        frame_layout = QVBoxLayout(frame)
+        self.frame_layout = QVBoxLayout(self.frame)
+        self.frame_layout.setContentsMargins(30, 40, 30, 20)
         
-        title = QLabel("AURA")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("color: #2196F3; font-size: 60px; font-weight: 100; letter-spacing: 15px; border: none;")
-        frame_layout.addWidget(title)
+        self.title = QLabel("AURA")
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("color: #2196F3; font-size: 60px; font-weight: 100; letter-spacing: 15px; border: none;")
+        self.frame_layout.addWidget(self.title)
         
-        subtitle = QLabel("INTELLIGENT RECONCILIATION")
-        subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("color: #888; font-size: 10px; letter-spacing: 4px; border: none;")
-        frame_layout.addWidget(subtitle)
+        self.subtitle = QLabel("INTELLIGENT RECONCILIATION")
+        self.subtitle.setAlignment(Qt.AlignCenter)
+        self.subtitle.setStyleSheet("color: #888; font-size: 10px; letter-spacing: 4px; border: none;")
+        self.frame_layout.addWidget(self.subtitle)
         
-        layout.addWidget(frame)
+        self.frame_layout.addStretch()
+
+        # Organization and Developer Info
+        info_layout = QHBoxLayout()
         
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(2000, self.accept)
+        self.dev_info = QLabel("Developed by Rafirose Khan Shah & Ruhi Khanna")
+        self.dev_info.setStyleSheet("color: #555; font-size: 9px; border: none;")
+        
+        self.org_info = QLabel("Powered by ANDILE SOLUTIONS")
+        self.org_info.setStyleSheet("color: #2196F3; font-size: 9px; font-weight: bold; letter-spacing: 1px; border: none;")
+        
+        info_layout.addWidget(self.dev_info)
+        info_layout.addStretch()
+        info_layout.addWidget(self.org_info)
+        
+        self.frame_layout.addLayout(info_layout)
+        
+        self.layout.addWidget(self.frame)
+        
+        # Opacity Effect for Transitions
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        
+        # Start Fade In
+        self.fade_in()
+
+    def fade_in(self):
+        self.anim_in = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim_in.setDuration(1000)
+        self.anim_in.setStartValue(0.0)
+        self.anim_in.setEndValue(1.0)
+        self.anim_in.setEasingCurve(QEasingCurve.InCubic)
+        self.anim_in.start()
+        
+        # Start timer for fade out after fade in finishes
+        QTimer.singleShot(3500, self.start_fade_out)
+
+    def start_fade_out(self):
+        self.anim_out = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim_out.setDuration(1000)
+        self.anim_out.setStartValue(1.0)
+        self.anim_out.setEndValue(0.0)
+        self.anim_out.setEasingCurve(QEasingCurve.OutCubic)
+        self.anim_out.finished.connect(self.accept)
+        self.anim_out.start()
 
 class LoginScreen(QDialog):
     login_success = Signal(dict) # Signal emits user info on success
@@ -45,22 +88,29 @@ class LoginScreen(QDialog):
         super().__init__()
         self.db = DatabaseManager()
         self.setWindowTitle("AI Recon Tool - Secure Login")
-        self.setFixedSize(400, 550)
-        self.setWindowFlags(Qt.FramelessWindowHint) 
+        self.setFixedSize(400, 580)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint) 
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         # Main Layout container
         self.container = QFrame(self)
-        self.container.setGeometry(0, 0, 400, 550)
+        self.container.setGeometry(0, 0, 400, 580)
         self.container.setStyleSheet("""
             QFrame {
                 background-color: #1e1e1e;
-                border: 2px solid #2196F3;
+                border: none;
                 border-radius: 15px;
             }
         """)
 
         self.main_layout = QVBoxLayout(self.container)
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Org Header for Login
+        self.org_header = QLabel("Powered by ANDILE SOLUTIONS")
+        self.org_header.setAlignment(Qt.AlignCenter)
+        self.org_header.setStyleSheet("color: #444; font-size: 9px; font-weight: bold; letter-spacing: 2px; margin-top: 15px; border: none;")
+        self.main_layout.addWidget(self.org_header)
         
         # Stacked Widget to switch between Login and Register
         self.stack = QStackedWidget()
@@ -74,6 +124,15 @@ class LoginScreen(QDialog):
         self.btn_close.setGeometry(360, 10, 30, 30)
         self.btn_close.setStyleSheet("color: white; font-size: 20px; border: none; background: transparent;")
         self.btn_close.clicked.connect(self.reject)
+
+        # Fade in animation
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim.setDuration(800)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.start()
 
     def init_login_ui(self):
         page = QWidget()
