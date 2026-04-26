@@ -29,7 +29,7 @@ class SplashScreen(QDialog):
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setStyleSheet("color: #2196F3; font-size: 60px; font-weight: 100; letter-spacing: 15px; border: none;")
         self.frame_layout.addWidget(self.title)
-        
+
         self.subtitle = QLabel("INTELLIGENT RECONCILIATION")
         self.subtitle.setAlignment(Qt.AlignCenter)
         self.subtitle.setStyleSheet("color: #888; font-size: 10px; letter-spacing: 4px; border: none;")
@@ -249,15 +249,16 @@ class LoginScreen(QDialog):
         """
 
     def handle_email_login(self):
-        email = self.email_input.text()
-        password = self.pass_input.text()
+        email = self.email_input.text().strip()
+        password = self.pass_input.text().strip()
         
-        if self.db.verify_credentials(email, password):
+        success, message = self.db.verify_credentials(email, password)
+        if success:
             self.user_data = {"type": "email", "id": email}
             self.login_success.emit(self.user_data)
             self.accept()
         else:
-            QMessageBox.warning(self, "Login Error", "Invalid Email or Password.")
+            QMessageBox.warning(self, "Login Error", message)
 
     def handle_registration(self):
         email = self.reg_email.text()

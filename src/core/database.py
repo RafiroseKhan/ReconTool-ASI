@@ -18,15 +18,18 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS users (
                     email TEXT PRIMARY KEY,
                     password TEXT,
-                    role TEXT DEFAULT 'user'
+                    role TEXT DEFAULT 'user',
+                    status TEXT DEFAULT 'Active'
                 )
             """)
             
-            # Migration check: If table exists but missing password column
+            # Migration check: If table exists but missing password or status column
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
             if "password" not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN password TEXT")
+            if "status" not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Active'")
 
             # User History: Tracks recon runs
             cursor.execute("""
@@ -74,12 +77,28 @@ class DatabaseManager:
         return sqlite3.connect(self.db_path)
 
     def verify_credentials(self, email, password):
-        """Verifies if user exists and password matches."""
+        """Verifies if user exists, password matches, and status is active."""
         with sqlite3.connect(self.db_path) as conn:
-            res = conn.execute("SELECT password FROM users WHERE email = ?", (email,)).fetchone()
-            if res and res[0] == password:
-                return True
-            return False
+            res = conn.execute("SELECT password, status FROM users WHERE email = ?", (email,)).fetchone()
+            if res:
+                if res[1] == 'Blocked':
+                    return False, "User is blocked. Contact administrator."
+                if res[0] == password:
+                    return True, "Login successful"
+                return False, "Invalid password"
+            return False, "User not found"
+
+    def update_user_status(self, email, status):
+        """Updates user status (Active/Blocked)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE users SET status = ? WHERE email = ?", (status, email))
+            conn.commit()
+            return True
+
+    def get_all_users(self):
+        """Fetches all users from the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            return conn.execute("SELECT email, role, status FROM users").fetchall()
 
     def create_user(self, email, password, role='user'):
         """Registers a new user."""

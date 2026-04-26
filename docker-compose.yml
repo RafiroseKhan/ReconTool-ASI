@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  recon-api:
+    build: .
+    container_name: recon_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Map these folders so uploads, outputs, and mapping data persist on your host machine
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+      - ./data:/app/data
+    restart: unless-stopped

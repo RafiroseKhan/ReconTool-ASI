@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+.git/
+.vscode/
+*.pyc
+*.pyo
+error_log_app.txt
+*.xlsx
+*.pdf
+uploads/
+output/

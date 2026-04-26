@@ -21,6 +21,8 @@ class ExcelReporter:
         Takes the dictionary from ReconEngine and writes a formatted Excel file with charts.
         """
         summary = recon_data.get("summary", {})
+        # Check if we are using a composite key
+        key_name = recon_data.get("key_name", "Unique Record ID")
         
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
             # 1. Generate Summary Sheet
@@ -50,7 +52,7 @@ class ExcelReporter:
             ["Missing in Source B (A only)", len(summary.get("only_in_a", []))],
             ["Missing in Source A (B only)", len(summary.get("only_in_b", []))],
             ["", ""],
-            ["Match Rate", f"{(total_matched / summary.get('total_a', 1) * 100):.2f}%"]
+            ["Match Rate", f"{(total_matched / max(summary.get('total_a', 1), 1) * 100):.2f}%"]
         ]
         
         df_summary = pd.DataFrame(summary_data)
@@ -82,35 +84,60 @@ class ExcelReporter:
         """Helper to write and style the detailed reconciliation sheet."""
         summary = recon_data.get("summary", {})
         details = recon_data.get("detail", [])
+        key_name = recon_data.get("key_name", "Unique Record ID")
+        
+        # WE ALWAYS LABEL THE FIRST COLUMN AS 'UNIQUE KEY' TO MATCH THE UI
+        current_key_col = "UNIQUE KEY"
         
         rows = []
         # Add Mismatches
         for item in details:
-            key = item["key"]
+            # IMPORTANT: item["key"] already contains the normalized, joined composite string (e.g. '699451+CA')
+            key_val = str(item["key"])
             for col, diff in item["differences"].items():
                 rows.append({
-                    "Unique Key": key,
-                    "Field": col,
-                    "Source A Value": diff["val_a"],
-                    "Source B Value": diff["val_b"],
-                    "Difference": "Value Mismatch",
-                    "Status": "MISMATCH"
+                    current_key_col: key_val,
+                    "Reconciliation Status": "VALUE BREAK",
+                    "Mapped Field Name": str(col),
+                    "Source A Value": str(diff.get("val_a", "")),
+                    "Source B Value": str(diff.get("val_b", "")),
+                    "Action Required": "Investigate Value Discrepancy"
                 })
         
         # Add Missing Rows
         for key in summary.get("only_in_a", []):
-            rows.append({"Unique Key": key, "Difference": "Missing in B", "Status": "ONLY IN A"})
+            rows.append({
+                current_key_col: str(key),
+                "Reconciliation Status": "MISSING IN B",
+                "Mapped Field Name": "N/A",
+                "Source A Value": "Record Present",
+                "Source B Value": "Record Missing",
+                "Action Required": "Check Source B Extraction"
+            })
         for key in summary.get("only_in_b", []):
-            rows.append({"Unique Key": key, "Difference": "Missing in A", "Status": "ONLY IN B"})
+            rows.append({
+                current_key_col: str(key),
+                "Reconciliation Status": "MISSING IN A",
+                "Mapped Field Name": "N/A",
+                "Source A Value": "Record Missing",
+                "Source B Value": "Record Present",
+                "Action Required": "Check Source A Extraction"
+            })
             
         df_details = pd.DataFrame(rows)
-        if df_details.empty:
-            df_details = pd.DataFrame(columns=["Unique Key", "Field", "Source A Value", "Source B Value", "Difference", "Status"])
-            df_details.loc[0] = ["No differences found", "-", "-", "-", "-", "MATCHED"]
-
-        df_details.to_excel(writer, sheet_name="Reconciliation Details", index=False)
         
-        ws = writer.sheets["Reconciliation Details"]
+        # Final Force: Ensure the columns are in the exact order requested
+        cols_order = [current_key_col, "Reconciliation Status", "Mapped Field Name", "Source A Value", "Source B Value", "Action Required"]
+        
+        if not df_details.empty:
+            df_details = df_details[cols_order]
+        else:
+            df_details = pd.DataFrame(columns=cols_order)
+            df_details.loc[0] = ["No differences found", "MATCHED", "-", "-", "-", "None"]
+
+        df_details.to_excel(writer, sheet_name="Exception Details", index=False)
+        
+        ws = writer.sheets["Exception Details"]
         
         # Apply header styling
         for cell in ws[1]:
@@ -120,11 +147,11 @@ class ExcelReporter:
 
         # Apply conditional formatting based on Status
         for row in range(2, ws.max_row + 1):
-            status = ws.cell(row=row, column=6).value
+            status = ws.cell(row=row, column=2).value
             fill = None
-            if status == "MISMATCH":
+            if status == "VALUE BREAK":
                 fill = self.MISMATCH_FILL
-            elif status and "ONLY IN" in str(status):
+            elif status and "MISSING" in str(status):
                 fill = self.MISSING_FILL
             
             if fill:
@@ -147,10 +174,11 @@ class ExcelReporter:
         ws = writer.sheets["Summary Dashboard"]
         
         # Data for the pie chart
-        total_matched = summary.get("matched", 0) - summary.get("mismatches", 0)
         mismatches = summary.get("mismatches", 0)
         only_a = len(summary.get("only_in_a", []))
         only_b = len(summary.get("only_in_b", []))
+        # Perfect matches are total matches minus mismatches
+        total_matched = summary.get("matched", 0) - mismatches
         
         # Place chart data in a hidden area or specific range
         ws["Z1"] = "Category"

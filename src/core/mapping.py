@@ -9,6 +9,9 @@ class SemanticMapper:
 
     def suggest_primary_key(self, df: pd.DataFrame) -> str:
         """Analyzes the DataFrame to suggest the most likely primary key column."""
+        if df.empty:
+            return ""
+            
         # Clean headers again just in case
         df.columns = [str(c).strip() for c in df.columns]
         
